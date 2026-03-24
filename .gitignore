@@ -77,3 +77,4 @@ tmp_http_*.log
 
 # Web
 **/web/
+android/app/fitflow.keystore
