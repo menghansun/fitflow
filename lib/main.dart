@@ -1,0 +1,128 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:intl/date_symbol_data_local.dart';
+
+import 'config/supabase_config.dart';
+import 'services/hive_service.dart';
+import 'services/supabase_service.dart';
+import 'providers/user_provider.dart';
+import 'providers/workout_provider.dart';
+import 'theme/app_theme.dart';
+import 'screens/main_screen.dart';
+import 'screens/auth/login_screen.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('zh_CN', null);
+  await HiveService.init();
+  // Supabase init — replace with your Project URL and anon key
+  await SupabaseService.init(supabaseUrl, supabaseAnonKey);
+  runApp(const FitFlowApp());
+}
+
+final _navigatorKey = GlobalKey<NavigatorState>();
+
+class FitFlowApp extends StatefulWidget {
+  const FitFlowApp({super.key});
+
+  @override
+  State<FitFlowApp> createState() => _FitFlowAppState();
+}
+
+class _FitFlowAppState extends State<FitFlowApp> {
+  String? _loadedUserId;
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => UserProvider()..init()),
+        ChangeNotifierProvider(create: (_) => WorkoutProvider()),
+      ],
+      child: StreamBuilder(
+        stream: SupabaseService.authStateChanges,
+        builder: (context, authSnapshot) {
+          final isLoggedIn = SupabaseService.instance.uid != null;
+
+          return Consumer<UserProvider>(
+            builder: (context, userProvider, _) {
+              if (!userProvider.initialized) {
+                return _buildMaterialApp(ThemeMode.system, const _SplashScreen());
+              }
+
+              // Not logged in → login screen
+              if (!isLoggedIn) {
+                return _buildMaterialApp(ThemeMode.system, const LoginScreen());
+              }
+
+              // Logged in → load workout data
+              if (userProvider.currentUser != null) {
+                final uid = userProvider.currentUser!.id;
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (_loadedUserId != uid) {
+                    _loadedUserId = uid;
+                    context.read<WorkoutProvider>().loadForUser(uid);
+                  }
+                });
+              } else if (isLoggedIn) {
+                // Supabase logged in but no local user → auto create local profile then load workouts
+                WidgetsBinding.instance.addPostFrameCallback((_) async {
+                  await userProvider.ensureLocalProfileAfterAuth('我');
+                  if (userProvider.currentUser != null) {
+                    final newUid = userProvider.currentUser!.id;
+                    if (_loadedUserId != newUid) {
+                      _loadedUserId = newUid;
+                      if (context.mounted) {
+                        context.read<WorkoutProvider>().loadForUser(newUid);
+                      }
+                    }
+                  }
+                });
+              }
+
+              final themeMode = userProvider.currentThemeMode;
+              return _buildMaterialApp(
+                themeMode,
+                const MainScreen(),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  MaterialApp _buildMaterialApp(ThemeMode themeMode, Widget home) {
+    return MaterialApp(
+      navigatorKey: _navigatorKey,
+      title: 'FitFlow',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeMode,
+      home: home,
+    );
+  }
+}
+
+class _SplashScreen extends StatelessWidget {
+  const _SplashScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('💪', style: TextStyle(fontSize: 64)),
+            SizedBox(height: 16),
+            Text('FitFlow', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+            SizedBox(height: 24),
+            CircularProgressIndicator(),
+          ],
+        ),
+      ),
+    );
+  }
+}
