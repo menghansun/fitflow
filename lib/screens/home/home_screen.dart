@@ -220,7 +220,9 @@ class _ValueCard extends StatefulWidget {
 
 class _ValueCardState extends State<_ValueCard> {
   static const String _prefKey = 'price_per_session';
+  static const String _prefKeyTarget = 'target_value';
   int _price = 40;
+  int _targetValue = 10000;
 
   @override
   void initState() {
@@ -230,44 +232,68 @@ class _ValueCardState extends State<_ValueCard> {
 
   Future<void> _loadPrice() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() => _price = prefs.getInt(_prefKey) ?? 40);
+    setState(() {
+      _price = prefs.getInt(_prefKey) ?? 40;
+      _targetValue = prefs.getInt(_prefKeyTarget) ?? 10000;
+    });
   }
 
   Future<void> _editPrice() async {
-    final ctrl = TextEditingController(text: '$_price');
-    final result = await showDialog<int>(
+    final priceCtrl = TextEditingController(text: '$_price');
+    final targetCtrl = TextEditingController(text: '$_targetValue');
+    final result = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('设置单次价值'),
-        content: TextField(
-          controller: ctrl,
-          keyboardType: TextInputType.number,
-          autofocus: true,
-          decoration: const InputDecoration(
-            prefixText: '¥ ',
-            suffixText: '/ 次',
-            hintText: '如 40',
-          ),
+        title: const Text('设置运动价值'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: priceCtrl,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              decoration: const InputDecoration(
+                prefixText: '单次价值 ¥ ',
+                suffixText: '/ 次',
+                hintText: '如 40',
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: targetCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                prefixText: '回本目标 ¥ ',
+                hintText: '如 10000',
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(context, false),
             child: const Text('取消'),
           ),
           TextButton(
-            onPressed: () {
-              final v = int.tryParse(ctrl.text.trim());
-              if (v != null && v > 0) Navigator.pop(context, v);
-            },
+            onPressed: () => Navigator.pop(context, true),
             child: const Text('确定'),
           ),
         ],
       ),
     );
-    if (result != null) {
-      setState(() => _price = result);
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(_prefKey, result);
+    if (result == true) {
+      final price = int.tryParse(priceCtrl.text.trim());
+      final target = int.tryParse(targetCtrl.text.trim());
+      if (price != null && price > 0) {
+        setState(() => _price = price);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt(_prefKey, price);
+      }
+      if (target != null && target > 0) {
+        setState(() => _targetValue = target);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt(_prefKeyTarget, target);
+      }
     }
   }
 
@@ -275,6 +301,25 @@ class _ValueCardState extends State<_ValueCard> {
   Widget build(BuildContext context) {
     final totalValue = widget.totalSessions * _price;
     final monthValue = widget.monthSessions * _price;
+
+    // 计算回本倒计时
+    String _countdownText() {
+      if (totalValue >= _targetValue) return '已达成';
+      final remaining = _targetValue - totalValue;
+      final sessionsNeeded = (remaining / _price).ceil();
+      // 直接显示数字，更简洁
+      if (sessionsNeeded > 100) {
+        return '$sessionsNeeded 次';
+      } else if (sessionsNeeded > 12) {
+        final months = (sessionsNeeded / 3).ceil();
+        return '$months 个月';
+      } else if (sessionsNeeded > 4) {
+        final weeks = (sessionsNeeded / 1.5).ceil();
+        return '$weeks 周';
+      } else {
+        return '$sessionsNeeded 次';
+      }
+    }
 
     return Container(
       decoration: BoxDecoration(
@@ -403,6 +448,68 @@ class _ValueCardState extends State<_ValueCard> {
                     fontSize: 12,
                   ),
                 ),
+                const SizedBox(height: 12),
+                // 回本目标进度
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha:0.06),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            '回本目标',
+                            style: TextStyle(
+                              color: Color(0xFF9D86CC),
+                              fontSize: 12,
+                            ),
+                          ),
+                          Text(
+                            '¥$totalValue / ¥$_targetValue',
+                            style: const TextStyle(
+                              color: Color(0xFFDDD6FE),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: totalValue > _targetValue
+                              ? 1.0
+                              : totalValue / _targetValue,
+                          backgroundColor: Colors.white.withValues(alpha:0.1),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            totalValue >= _targetValue
+                                ? const Color(0xFF34D399)
+                                : const Color(0xFFFBBF24),
+                          ),
+                          minHeight: 6,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        totalValue >= _targetValue
+                            ? '✅ 已达成目标！'
+                            : '还差 ¥${_targetValue - totalValue} 达成目标',
+                        style: TextStyle(
+                          color: totalValue >= _targetValue
+                              ? const Color(0xFF34D399)
+                              : const Color(0xFF9D86CC),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -425,16 +532,16 @@ class _ValueCardState extends State<_ValueCard> {
                       Container(
                           width: 1, height: 36, color: Colors.white12),
                       _MiniStat(
-                        label: '单次价值',
-                        value: '¥$_price',
-                        sub: '点右上角修改',
+                        label: '今年已省',
+                        value: '¥${widget.yearSessions * _price}',
+                        sub: '${widget.yearSessions} 次',
                       ),
                       Container(
                           width: 1, height: 36, color: Colors.white12),
                       _MiniStat(
-                        label: '今年已省',
-                        value: '¥${widget.yearSessions * _price}',
-                        sub: '${widget.yearSessions} 次',
+                        label: '回本倒计时',
+                        value: _countdownText(),
+                        sub: totalValue >= _targetValue ? '🎉' : '坚持运动',
                       ),
                     ],
                   ),

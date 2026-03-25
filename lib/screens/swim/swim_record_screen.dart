@@ -968,7 +968,6 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
                   _heartRateEnabled = v;
                   if (v && _avgHeartRate == null) _avgHeartRate = 120;
                 }),
-                activeThumbColor: Colors.pinkAccent,
               ),
             ],
           ),
@@ -1041,7 +1040,6 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
                   _caloriesEnabled = v;
                   if (v && _calories == null) _calories = 400;
                 }),
-                activeThumbColor: AppColors.gymAccent,
               ),
             ],
           ),

@@ -140,12 +140,18 @@ class WorkoutProvider extends ChangeNotifier {
   int getWorkoutCountForPeriod(DateTime start, DateTime end) =>
       _inPeriod(start, end).length;
 
-  List<WorkoutSession> _inPeriod(DateTime start, DateTime end) =>
-      _sessions.where((s) =>
-          s.countsAsWorkout &&
-          !s.date.isBefore(DateTime(start.year, start.month, start.day)) &&
-          !s.date.isAfter(
-              DateTime(end.year, end.month, end.day, 23, 59, 59))).toList();
+  List<WorkoutSession> _inPeriod(DateTime start, DateTime end) {
+    final startDate = DateTime(start.year, start.month, start.day);
+    final endDateTime = DateTime(end.year, end.month, end.day, 23, 59, 59);
+    final result = _sessions.where((s) {
+      // Compare only date components (year, month, day) to avoid timezone issues
+      final sessionDate = DateTime(s.date.year, s.date.month, s.date.day);
+      final before = !sessionDate.isBefore(startDate);
+      final after = !sessionDate.isAfter(endDateTime);
+      return before && after && s.countsAsWorkout;
+    }).toList();
+    return result;
+  }
 
   // ── Stats for chart ────────────────────────────────────
 

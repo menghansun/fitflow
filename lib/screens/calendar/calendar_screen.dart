@@ -729,7 +729,7 @@ class _DayCell extends StatelessWidget {
                       if (totalCals > 0)
                         _DayChip(
                           text: '$totalCals千卡',
-                          color: AppColors.gymAccent,
+                          color: const Color(0xFFFF4D4D),
                           isDark: isDark,
                         ),
                       if (totalCals > 0) const SizedBox(height: 2),
