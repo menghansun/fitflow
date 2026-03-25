@@ -100,6 +100,7 @@ class _FitFlowAppState extends State<FitFlowApp> {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
+      locale: const Locale('zh', 'CN'),
       home: home,
     );
   }

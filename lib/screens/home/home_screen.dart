@@ -307,18 +307,7 @@ class _ValueCardState extends State<_ValueCard> {
       if (totalValue >= _targetValue) return '已达成';
       final remaining = _targetValue - totalValue;
       final sessionsNeeded = (remaining / _price).ceil();
-      // 直接显示数字，更简洁
-      if (sessionsNeeded > 100) {
-        return '$sessionsNeeded 次';
-      } else if (sessionsNeeded > 12) {
-        final months = (sessionsNeeded / 3).ceil();
-        return '$months 个月';
-      } else if (sessionsNeeded > 4) {
-        final weeks = (sessionsNeeded / 1.5).ceil();
-        return '$weeks 周';
-      } else {
-        return '$sessionsNeeded 次';
-      }
+      return '$sessionsNeeded 次';
     }
 
     return Container(
