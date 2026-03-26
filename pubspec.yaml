@@ -58,3 +58,4 @@ flutter:
 
   assets:
     - assets/exercises/
+    - assets/splash.gif

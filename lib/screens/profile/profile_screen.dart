@@ -104,7 +104,7 @@ class ProfileScreen extends StatelessWidget {
 
               _SettingsTile(
                 icon: Icons.bar_chart_rounded,
-                title: '月度运动报告',
+                title: '游泳报告',
                 subtitle: '查看本月训练总结',
                 onTap: () {
                   final now = DateTime.now();
@@ -348,18 +348,20 @@ class _UserHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            primary.withValues(alpha:0.15),
-            primary.withValues(alpha:0.05),
-          ],
+          colors: isDark
+              ? [primary.withValues(alpha:0.25), primary.withValues(alpha:0.1)]
+              : [primary.withValues(alpha:0.12), primary.withValues(alpha:0.04)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: primary.withValues(alpha:0.2)),
+        border: Border.all(color: primary.withValues(alpha:0.15)),
       ),
       child: Row(
         children: [
@@ -367,8 +369,12 @@ class _UserHeader extends StatelessWidget {
             width: 64,
             height: 64,
             decoration: BoxDecoration(
-              color: primary.withValues(alpha:0.2),
+              color: primary.withValues(alpha: isDark ? 0.3 : 0.2),
               shape: BoxShape.circle,
+              border: Border.all(
+                color: primary.withValues(alpha:0.3),
+                width: 2,
+              ),
             ),
             child: Center(
               child: Text(user.avatarEmoji ?? '💪',
@@ -380,11 +386,41 @@ class _UserHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(user.nickname, style: theme.textTheme.headlineMedium),
+                Text(
+                  user.nickname,
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 Text(
                   '加入 FitFlow ${_daysSince(user.createdAt)} 天',
-                  style: theme.textTheme.bodyMedium,
+                  style: TextStyle(
+                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: primary.withValues(alpha:0.12),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.verified, color: primary, size: 14),
+                const SizedBox(width: 4),
+                Text(
+                  '会员',
+                  style: TextStyle(
+                    color: primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
@@ -450,22 +486,48 @@ class _MiniStat extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkCard : Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: Border(
+          left: BorderSide(color: color, width: 4),
+        ),
       ),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(icon, style: const TextStyle(fontSize: 24)),
+          Row(
+            children: [
+              Text(icon, style: const TextStyle(fontSize: 20)),
+              const Spacer(),
+              Container(
+                width: 8, height: 8,
+                decoration: BoxDecoration(
+                  color: color, shape: BoxShape.circle,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
-          Text(value,
-              style: TextStyle(
-                  color: color,
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold)),
-          Text(label, style: theme.textTheme.bodyMedium),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ],
       ),
     );

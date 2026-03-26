@@ -2,7 +2,6 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
 import 'package:path_provider/path_provider.dart';
@@ -15,7 +14,104 @@ import '../../providers/workout_provider.dart';
 const _swimPrimary = Color(0xFF00D4FF);
 const _swimDark = Color(0xFF0099CC);
 const _swimLight = Color(0xFFE0F7FF);
-const _cardBg = Color(0xFFF0F9FF);
+
+class _SwimMilestone {
+  final String emoji;
+  final String title;
+  final String value;
+  final DateTime? achievedAt;
+  final bool achieved;
+
+  const _SwimMilestone({
+    required this.emoji,
+    required this.title,
+    required this.value,
+    this.achievedAt,
+    this.achieved = false,
+  });
+}
+
+List<_SwimMilestone> _computeMilestones(List<WorkoutSession> allSwimSessions) {
+  if (allSwimSessions.isEmpty) {
+    return [
+      const _SwimMilestone(emoji: '🐣', title: '首次下泳池', value: '0km', achieved: false),
+      const _SwimMilestone(emoji: '🏅', title: '累计1公里', value: '0/1km', achieved: false),
+      const _SwimMilestone(emoji: '🎯', title: '累计10公里', value: '0/10km', achieved: false),
+      const _SwimMilestone(emoji: '🔥', title: '累计50公里', value: '0/50km', achieved: false),
+      const _SwimMilestone(emoji: '👑', title: '累计100公里', value: '0/100km', achieved: false),
+    ];
+  }
+
+  final sorted = List<WorkoutSession>.from(allSwimSessions)
+    ..sort((a, b) => a.date.compareTo(b.date));
+
+  int totalDistMeters = 0;
+  int bestPaceSec = 999999;
+  DateTime? firstSwimDate;
+  DateTime? bestPaceDate;
+
+  for (final s in sorted) {
+    final dist = s.totalDistanceMeters ?? 0;
+    totalDistMeters += dist;
+
+    if (dist > 0 && s.durationInMinutes > 0) {
+      final paceSec = ((s.durationInMinutes / (dist / 100)).round() * 60).round();
+      if (paceSec < bestPaceSec && paceSec > 0) {
+        bestPaceSec = paceSec;
+        bestPaceDate = s.date;
+      }
+    }
+  }
+
+  if (sorted.isNotEmpty) firstSwimDate = sorted.first.date;
+
+  final milestones = <_SwimMilestone>[];
+  final km = totalDistMeters / 1000;
+
+  milestones.add(_SwimMilestone(
+    emoji: '🐣',
+    title: '首次下泳池',
+    value: '${(km).toStringAsFixed(1)}km',
+    achievedAt: firstSwimDate,
+    achieved: true,
+  ));
+
+  for (final target in [1.0, 5.0, 10.0, 50.0, 100.0, 200.0, 500.0]) {
+    final achieved = km >= target;
+    DateTime? achievedAt;
+    if (achieved) {
+      int acc = 0;
+      for (final s in sorted) {
+        acc += s.totalDistanceMeters ?? 0;
+        if (acc >= target * 1000) {
+          achievedAt = s.date;
+          break;
+        }
+      }
+    }
+    milestones.add(_SwimMilestone(
+      emoji: achieved ? '🏅' : '🔒',
+      title: '累计${target.toInt()}公里',
+      value: achieved ? '${km.toStringAsFixed(1)}km' : '${km.toStringAsFixed(1)}/${target.toInt()}km',
+      achievedAt: achievedAt,
+      achieved: achieved,
+    ));
+  }
+
+  if (bestPaceSec < 999999) {
+    final min = bestPaceSec ~/ 60;
+    final sec = bestPaceSec % 60;
+    milestones.add(_SwimMilestone(
+      emoji: '⚡',
+      title: '最快配速',
+      value: "$min\'${sec.toString().padLeft(2, '0')}/百米",
+      achievedAt: bestPaceDate,
+      achieved: true,
+    ));
+  }
+
+  return milestones;
+}
 
 class MonthlyReportScreen extends StatefulWidget {
   final int year;
@@ -29,7 +125,11 @@ class MonthlyReportScreen extends StatefulWidget {
 }
 
 class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
+  late int _year;
+  late int _month;
   List<WorkoutSession> _swimSessions = [];
+  List<WorkoutSession> _prevSwimSessions = [];
+  List<_SwimMilestone> _milestones = [];
   bool _loading = true;
   bool _saving = false;
   final GlobalKey _repaintKey = GlobalKey();
@@ -37,31 +137,89 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
   @override
   void initState() {
     super.initState();
+    _year = widget.year;
+    _month = widget.month;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadSwimData();
     });
   }
 
   Future<void> _loadSwimData() async {
+    setState(() => _loading = true);
     try {
       final provider = context.read<WorkoutProvider>();
-      final sessions = provider.getSessionsForMonth(widget.year, widget.month)
+
+      // Current month
+      final sessions = provider.getSessionsForMonth(_year, _month)
           .where((s) => s.type == WorkoutType.swim && s.countsAsWorkout)
           .toList();
       sessions.sort((a, b) => a.date.compareTo(b.date));
 
+      // Previous month for comparison
+      final prevMonth = _month == 1 ? 12 : _month - 1;
+      final prevYear = _month == 1 ? _year - 1 : _year;
+      final prevSessions = provider.getSessionsForMonth(prevYear, prevMonth)
+          .where((s) => s.type == WorkoutType.swim && s.countsAsWorkout)
+          .toList();
+
+      // All swim sessions for milestones
+      final allSwim = provider.sessions
+          .where((s) => s.type == WorkoutType.swim && s.countsAsWorkout)
+          .toList();
+      final milestones = _computeMilestones(allSwim);
+
       if (mounted) {
         setState(() {
           _swimSessions = sessions;
+          _prevSwimSessions = prevSessions;
+          _milestones = milestones;
           _loading = false;
         });
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _loading = false;
-        });
+        setState(() => _loading = false);
       }
+    }
+  }
+
+  void _goToPrevMonth() {
+    setState(() {
+      if (_month == 1) {
+        _month = 12;
+        _year--;
+      } else {
+        _month--;
+      }
+    });
+    _loadSwimData();
+  }
+
+  void _goToNextMonth() {
+    final now = DateTime.now();
+    if (_year > now.year || (_year == now.year && _month >= now.month)) return;
+    setState(() {
+      if (_month == 12) {
+        _month = 1;
+        _year++;
+      } else {
+        _month++;
+      }
+    });
+    _loadSwimData();
+  }
+
+  Future<void> _showMonthPicker() async {
+    final result = await showDialog<DateTime>(
+      context: context,
+      builder: (ctx) => _MonthPickerDialog(initialYear: _year, initialMonth: _month),
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _year = result.year;
+        _month = result.month;
+      });
+      _loadSwimData();
     }
   }
 
@@ -144,7 +302,7 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
       }
 
       final tempDir = await getTemporaryDirectory();
-      final fileName = 'FitFlow_${widget.year}${widget.month.toString().padLeft(2, '0')}_report.png';
+      final fileName = 'FitFlow_${_year}${_month.toString().padLeft(2, '0')}_report.png';
       final file = File('${tempDir.path}/$fileName');
       await file.writeAsBytes(byteData.buffer.asUint8List());
 
@@ -160,7 +318,7 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
           }
         }
       } else {
-        await Share.shareXFiles([XFile(file.path)], text: 'FitFlow ${widget.year}年${widget.month}月游泳报告 🏊');
+        await Share.shareXFiles([XFile(file.path)], text: 'FitFlow $_year年$_month月游泳报告 🏊');
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('操作失败: $e')));
@@ -171,7 +329,7 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final monthName = '${widget.year}年${widget.month}月';
+    final monthName = '$_year年$_month月';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FB),
@@ -210,11 +368,166 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
                     key: _repaintKey,
                     child: _SwimReportContent(
                       sessions: _swimSessions,
-                      year: widget.year,
-                      month: widget.month,
+                      prevSessions: _prevSwimSessions,
+                      year: _year,
+                      month: _month,
+                      milestones: _milestones,
+                      onTapMonth: _showMonthPicker,
                     ),
                   ),
                 ),
+    );
+  }
+}
+
+class _MonthPickerDialog extends StatefulWidget {
+  final int initialYear;
+  final int initialMonth;
+
+  const _MonthPickerDialog({required this.initialYear, required this.initialMonth});
+
+  @override
+  State<_MonthPickerDialog> createState() => _MonthPickerDialogState();
+}
+
+class _MonthPickerDialogState extends State<_MonthPickerDialog> {
+  late int _selectedYear;
+  late int _selectedMonth;
+  late FixedExtentScrollController _yearController;
+  late FixedExtentScrollController _monthController;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedYear = widget.initialYear;
+    _selectedMonth = widget.initialMonth;
+    _yearController = FixedExtentScrollController(
+      initialItem: _selectedYear - 2000,
+    );
+    _monthController = FixedExtentScrollController(
+      initialItem: _selectedMonth - 1,
+    );
+  }
+
+  @override
+  void dispose() {
+    _yearController.dispose();
+    _monthController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return AlertDialog(
+      title: const Text('选择月份', textAlign: TextAlign.center),
+      content: SizedBox(
+        height: 200,
+        child: Row(
+          children: [
+            Expanded(
+              child: ListWheelScrollView.useDelegate(
+                controller: _yearController,
+                itemExtent: 40,
+                perspective: 0.003,
+                diameterRatio: 1.2,
+                physics: const FixedExtentScrollPhysics(),
+                onSelectedItemChanged: (index) {
+                  setState(() => _selectedYear = 2000 + index);
+                },
+                childDelegate: ListWheelChildBuilderDelegate(
+                  builder: (context, index) {
+                    final year = 2000 + index;
+                    final isSelected = year == _selectedYear;
+                    return Center(
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? const Color(0xFF00D4FF).withValues(alpha: 0.15)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '$year年',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            color: isSelected
+                                ? const Color(0xFF00D4FF)
+                                : (isDark ? Colors.white : Colors.black87),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  childCount: now.year - 1999,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: ListWheelScrollView.useDelegate(
+                controller: _monthController,
+                itemExtent: 40,
+                perspective: 0.003,
+                diameterRatio: 1.2,
+                physics: const FixedExtentScrollPhysics(),
+                onSelectedItemChanged: (index) {
+                  setState(() => _selectedMonth = index + 1);
+                },
+                childDelegate: ListWheelChildBuilderDelegate(
+                  builder: (context, index) {
+                    final month = index + 1;
+                    final isSelected = month == _selectedMonth;
+                    final isFuture = _selectedYear == now.year && month > now.month;
+                    return Center(
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? const Color(0xFF00D4FF).withValues(alpha: 0.15)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${month}月',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            color: isSelected
+                                ? const Color(0xFF00D4FF)
+                                : (isFuture
+                                    ? Colors.grey
+                                    : (isDark ? Colors.white : Colors.black87)),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  childCount: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, DateTime(_selectedYear, _selectedMonth)),
+          child: const Text('确定'),
+        ),
+      ],
     );
   }
 }
@@ -243,10 +556,20 @@ class _EmptyState extends StatelessWidget {
 
 class _SwimReportContent extends StatelessWidget {
   final List<WorkoutSession> sessions;
+  final List<WorkoutSession> prevSessions;
   final int year;
   final int month;
+  final List<_SwimMilestone> milestones;
+  final VoidCallback onTapMonth;
 
-  const _SwimReportContent({required this.sessions, required this.year, required this.month});
+  const _SwimReportContent({
+    required this.sessions,
+    required this.prevSessions,
+    required this.year,
+    required this.month,
+    required this.milestones,
+    required this.onTapMonth,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -254,6 +577,24 @@ class _SwimReportContent extends StatelessWidget {
     final totalMinutes = sessions.fold<int>(0, (sum, s) => sum + s.durationInMinutes);
     final avgDistance = sessions.isEmpty ? '0' : (totalDistance / sessions.length / 1000).toStringAsFixed(1);
     final avgPace = _calcAvgPace(sessions);
+
+    // Previous month stats for comparison
+    final prevTotalDist = prevSessions.fold<int>(0, (sum, s) => sum + (s.totalDistanceMeters ?? 0));
+    final prevCount = prevSessions.length;
+    final prevAvgPace = _calcPaceValue(prevSessions);
+
+    // Compute month-over-month deltas
+    final distDelta = prevTotalDist > 0
+        ? ((totalDistance - prevTotalDist) / prevTotalDist * 100).round()
+        : (totalDistance > 0 ? 100 : 0);
+    final countDelta = prevCount > 0
+        ? ((sessions.length - prevCount) / prevCount * 100).round()
+        : (sessions.length > 0 ? 100 : 0);
+    final paceDelta = prevAvgPace != null && prevAvgPace > 0
+        ? ((_calcPaceValue(sessions)! - prevAvgPace) / prevAvgPace * 100).round()
+        : 0;
+    // Pace: lower is better, so negative delta is good
+    final paceBetter = paceDelta < 0;
 
     // Style breakdown
     final styleCount = <SwimStyle, int>{};
@@ -276,6 +617,7 @@ class _SwimReportContent extends StatelessWidget {
           totalDistance: totalDistance,
           avgDistance: avgDistance,
           monthName: '$year年$month月',
+          onTapMonth: onTapMonth,
         ),
         const SizedBox(height: 16),
 
@@ -319,6 +661,24 @@ class _SwimReportContent extends StatelessWidget {
             )),
           ],
         ),
+        const SizedBox(height: 16),
+
+        // ── Month-over-Month Comparison ─────────────────
+        _MonthComparisonCard(
+          distDelta: distDelta,
+          countDelta: countDelta,
+          paceDelta: paceDelta,
+          paceBetter: paceBetter,
+          hasPrev: prevSessions.isNotEmpty,
+        ),
+        const SizedBox(height: 16),
+
+        // ── Training Heatmap ─────────────────────────────
+        _MonthHeatmapCard(year: year, month: month, sessions: sessions),
+        const SizedBox(height: 16),
+
+        // ── Milestones ────────────────────────────────────
+        _MilestonesCard(milestones: milestones),
         const SizedBox(height: 20),
 
         // ── Distance Trend Chart ──────────────────────────
@@ -341,6 +701,17 @@ class _SwimReportContent extends StatelessWidget {
     );
   }
 
+  int? _calcPaceValue(List<WorkoutSession> sess) {
+    int totalDist = 0;
+    int totalMin = 0;
+    for (final s in sess) {
+      totalDist += s.totalDistanceMeters ?? 0;
+      totalMin += s.durationInMinutes;
+    }
+    if (totalDist == 0) return null;
+    return ((totalMin / (totalDist / 100)).round());
+  }
+
   String _calcAvgPace(List<WorkoutSession> sessions) {
     int totalDist = 0;
     int totalMin = 0;
@@ -356,17 +727,449 @@ class _SwimReportContent extends StatelessWidget {
   }
 }
 
+class _MonthComparisonCard extends StatelessWidget {
+  final int distDelta;
+  final int countDelta;
+  final int paceDelta;
+  final bool paceBetter;
+  final bool hasPrev;
+
+  const _MonthComparisonCard({
+    required this.distDelta,
+    required this.countDelta,
+    required this.paceDelta,
+    required this.paceBetter,
+    required this.hasPrev,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!hasPrev) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Text('📊', style: TextStyle(fontSize: 16)),
+              SizedBox(width: 6),
+              Text('上月对比', style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF3D3D3D),
+              )),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: _DeltaTile(
+                label: '总距离',
+                delta: distDelta,
+                positiveGood: true,
+                icon: '📏',
+                color: _swimPrimary,
+              )),
+              const SizedBox(width: 10),
+              Expanded(child: _DeltaTile(
+                label: '训练次数',
+                delta: countDelta,
+                positiveGood: true,
+                icon: '🏊',
+                color: const Color(0xFFFF8FA3),
+              )),
+              const SizedBox(width: 10),
+              Expanded(child: _DeltaTile(
+                label: '配速',
+                delta: paceDelta,
+                positiveGood: paceBetter,
+                icon: '⚡',
+                color: const Color(0xFFFFB347),
+              )),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DeltaTile extends StatelessWidget {
+  final String label;
+  final int delta;
+  final bool positiveGood;
+  final String icon;
+  final Color color;
+
+  const _DeltaTile({
+    required this.label,
+    required this.delta,
+    required this.positiveGood,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isPositive = delta >= 0;
+    final isGood = positiveGood ? isPositive : !isPositive;
+    final effectiveDelta = delta.abs();
+    final arrow = isPositive ? '↑' : '↓';
+    final deltaColor = isGood ? const Color(0xFF34C759) : const Color(0xFFFF3B30);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      decoration: BoxDecoration(
+        color: (isGood ? const Color(0xFF34C759) : const Color(0xFFFF3B30)).withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        children: [
+          Text(icon, style: const TextStyle(fontSize: 16)),
+          const SizedBox(height: 4),
+          Text(
+            '$arrow$effectiveDelta%',
+            style: TextStyle(
+              color: deltaColor,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MonthHeatmapCard extends StatelessWidget {
+  final int year;
+  final int month;
+  final List<WorkoutSession> sessions;
+
+  const _MonthHeatmapCard({
+    required this.year,
+    required this.month,
+    required this.sessions,
+  });
+
+  String _styleEmoji(SwimStyle style) {
+    switch (style) {
+      case SwimStyle.freestyle: return '🏊';
+      case SwimStyle.breaststroke: return '🐸';
+      case SwimStyle.backstroke: return '🔄';
+      case SwimStyle.butterfly: return '🦋';
+      case SwimStyle.medley: return '🌊';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+    final firstWeekday = DateTime(year, month, 1).weekday % 7; // 0=Sun
+
+    final dailyCalories = <int, int>{};
+    final dailyStyle = <int, SwimStyle>{};
+    for (final s in sessions) {
+      dailyCalories[s.date.day] = (dailyCalories[s.date.day] ?? 0) + (s.calories ?? 0);
+      if (s.swimSets != null && s.swimSets!.isNotEmpty) {
+        // Use the most logged style for the day
+        final styleCount = <SwimStyle, int>{};
+        for (final set in s.swimSets!) {
+          styleCount[set.style] = (styleCount[set.style] ?? 0) + set.distanceMeters;
+        }
+        final topStyle = styleCount.entries.reduce((a, b) => a.value > b.value ? a : b).key;
+        dailyStyle[s.date.day] = topStyle;
+      }
+    }
+
+    final maxCal = dailyCalories.values.isEmpty ? 1 : dailyCalories.values.reduce((a, b) => a > b ? a : b);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Text('🔥', style: TextStyle(fontSize: 16)),
+              SizedBox(width: 6),
+              Text('训练热度', style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF3D3D3D),
+              )),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Weekday labels
+          Row(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: ['日', '一', '二', '三', '四', '五', '六'].map((d) => SizedBox(
+              width: 36,
+              child: Text(d, textAlign: TextAlign.center, style: TextStyle(
+                fontSize: 10,
+                color: Colors.grey.shade500,
+                fontWeight: FontWeight.w500,
+              )),
+            )).toList(),
+          ),
+          const SizedBox(height: 4),
+          // Calendar grid
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              childAspectRatio: 1,
+            ),
+            itemCount: daysInMonth + firstWeekday,
+            itemBuilder: (context, index) {
+              if (index < firstWeekday) return const SizedBox.shrink();
+              final day = index - firstWeekday + 1;
+              final cal = dailyCalories[day] ?? 0;
+              final intensity = maxCal > 0 ? (cal / maxCal) : 0.0;
+
+              Color bgColor;
+              if (cal == 0) {
+                bgColor = Colors.grey.shade100;
+              } else if (intensity < 0.33) {
+                bgColor = _swimPrimary.withValues(alpha: 0.25);
+              } else if (intensity < 0.66) {
+                bgColor = _swimPrimary.withValues(alpha: 0.5);
+              } else {
+                bgColor = _swimPrimary.withValues(alpha: 0.85);
+              }
+
+              return Center(
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: bgColor,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Center(
+                    child: dailyStyle[day] != null
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                '${_styleEmoji(dailyStyle[day]!)}',
+                                style: const TextStyle(fontSize: 8),
+                              ),
+                              const SizedBox(width: 1),
+                              Text(
+                                '$day',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                  color: intensity > 0.5 ? Colors.white : Colors.grey.shade700,
+                                ),
+                              ),
+                            ],
+                          )
+                        : Text(
+                            '$day',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: intensity > 0.5 ? Colors.white : Colors.grey.shade700,
+                            ),
+                          ),
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 10),
+          // Legend
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('低', style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
+              const SizedBox(width: 4),
+              ...[0.15, 0.35, 0.6, 0.85].map((opacity) => Container(
+                width: 16,
+                height: 16,
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                decoration: BoxDecoration(
+                  color: _swimPrimary.withValues(alpha: opacity),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              )),
+              const SizedBox(width: 4),
+              Text('高', style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MilestonesCard extends StatelessWidget {
+  final List<_SwimMilestone> milestones;
+
+  const _MilestonesCard({required this.milestones});
+
+  @override
+  Widget build(BuildContext context) {
+    final achieved = milestones.where((m) => m.achieved).toList();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('🏆', style: TextStyle(fontSize: 16)),
+              const SizedBox(width: 6),
+              const Text('游泳成就', style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF3D3D3D),
+              )),
+              const Spacer(),
+              Text(
+                '${achieved.length}已解锁',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _swimPrimary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: milestones.map((m) => _MilestoneChip(milestone: m)).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MilestoneChip extends StatelessWidget {
+  final _SwimMilestone milestone;
+
+  const _MilestoneChip({required this.milestone});
+
+  @override
+  Widget build(BuildContext context) {
+    final achieved = milestone.achieved;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: achieved
+            ? _swimPrimary.withValues(alpha: 0.1)
+            : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: achieved
+              ? _swimPrimary.withValues(alpha: 0.3)
+              : Colors.grey.shade300,
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            milestone.emoji,
+            style: TextStyle(
+              fontSize: 16,
+              color: achieved ? null : Colors.grey,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                milestone.title,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: achieved ? const Color(0xFF3D3D3D) : Colors.grey,
+                ),
+              ),
+              Text(
+                milestone.value,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: achieved ? _swimPrimary : Colors.grey.shade400,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SwimHeaderCard extends StatelessWidget {
   final int sessionCount;
   final int totalDistance;
   final String avgDistance;
   final String monthName;
+  final VoidCallback onTapMonth;
 
   const _SwimHeaderCard({
     required this.sessionCount,
     required this.totalDistance,
     required this.avgDistance,
     required this.monthName,
+    required this.onTapMonth,
   });
 
   @override
@@ -423,12 +1226,26 @@ class _SwimHeaderCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 16),
-                Text(
-                  monthName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
+                GestureDetector(
+                  onTap: onTapMonth,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        monthName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.keyboard_arrow_down,
+                        color: Colors.white.withValues(alpha: 0.7),
+                        size: 26,
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -1147,11 +1964,31 @@ class _SwimSessionTile extends StatelessWidget {
 
   const _SwimSessionTile({required this.session});
 
+  String _styleEmoji(SwimStyle style) {
+    switch (style) {
+      case SwimStyle.freestyle: return '🏊';
+      case SwimStyle.breaststroke: return '🐸';
+      case SwimStyle.backstroke: return '🔄';
+      case SwimStyle.butterfly: return '🦋';
+      case SwimStyle.medley: return '🌊';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final dist = session.totalDistanceMeters ?? 0;
     final duration = session.durationInMinutes;
     final dateStr = '${session.date.month}月${session.date.day}日';
+
+    SwimStyle? topStyle;
+    if (session.swimSets != null && session.swimSets!.isNotEmpty) {
+      final styleCount = <SwimStyle, int>{};
+      for (final set in session.swimSets!) {
+        styleCount[set.style] = (styleCount[set.style] ?? 0) + set.distanceMeters;
+      }
+      topStyle = styleCount.entries.reduce((a, b) => a.value > b.value ? a : b).key;
+    }
+    final styleEmoji = topStyle != null ? _styleEmoji(topStyle) : '🏊';
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -1164,8 +2001,8 @@ class _SwimSessionTile extends StatelessWidget {
               color: _swimLight,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Center(
-              child: Text('🏊', style: TextStyle(fontSize: 20)),
+            child: Center(
+              child: Text(styleEmoji, style: const TextStyle(fontSize: 20)),
             ),
           ),
           const SizedBox(width: 12),

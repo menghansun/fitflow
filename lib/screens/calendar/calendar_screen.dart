@@ -785,10 +785,32 @@ class _DayCell extends StatelessWidget {
     final types = s.map((e) => e.type).toSet();
     if (types.length > 1) return '🔥';
     return switch (types.first) {
-      WorkoutType.swim => '🏊',
+      WorkoutType.swim => _swimStyleEmoji(s),
       WorkoutType.gym => '💪',
       WorkoutType.cardio => '🏃',
       WorkoutType.other => '📌',
+    };
+  }
+
+  String _swimStyleEmoji(List<WorkoutSession> sessions) {
+    final swimSessions = sessions.where((s) => s.type == WorkoutType.swim).toList();
+    if (swimSessions.isEmpty) return '🏊';
+    final styleCount = <SwimStyle, int>{};
+    for (final session in swimSessions) {
+      if (session.swimSets != null) {
+        for (final set in session.swimSets!) {
+          styleCount[set.style] = (styleCount[set.style] ?? 0) + set.distanceMeters;
+        }
+      }
+    }
+    if (styleCount.isEmpty) return '🏊';
+    final topStyle = styleCount.entries.reduce((a, b) => a.value > b.value ? a : b).key;
+    return switch (topStyle) {
+      SwimStyle.freestyle => '🏊',
+      SwimStyle.breaststroke => '🐸',
+      SwimStyle.backstroke => '🔄',
+      SwimStyle.butterfly => '🦋',
+      SwimStyle.medley => '🌊',
     };
   }
 
