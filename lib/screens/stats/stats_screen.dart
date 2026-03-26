@@ -2216,16 +2216,31 @@ class _ActivityChart extends StatelessWidget {
           return _bar(i, count.toDouble());
         });
       case _Period.month:
-        final weeks = ((end.day) / 7).ceil();
+        // 按自然周（周一到周日）划分
+        final firstDayOfMonth = DateTime(start.year, start.month, 1);
+        // 找到本月第一周的周一（可能在月初之前）
+        final daysFromMonday = firstDayOfMonth.weekday - 1; // 0=Mon, 6=Sun
+        final firstMonday = daysFromMonday == 0
+            ? firstDayOfMonth
+            : firstDayOfMonth.subtract(Duration(days: daysFromMonday));
+
+        // 找到本月最后一周的周日（可能在月后）
+        final lastDayOfMonth = DateTime(start.year, start.month + 1, 0);
+        final daysToSunday = 7 - lastDayOfMonth.weekday;
+        final lastSunday = lastDayOfMonth.add(
+            Duration(days: daysToSunday == 7 ? 0 : daysToSunday));
+
+        // 计算周数
+        final totalDays = lastSunday.difference(firstMonday).inDays + 1;
+        final weeks = (totalDays / 7).ceil();
+
         return List.generate(weeks, (i) {
-          final wStart =
-              DateTime(start.year, start.month, 1 + i * 7);
-          final wEnd =
-              DateTime(start.year, start.month, (i + 1) * 7);
+          final wStart = firstMonday.add(Duration(days: i * 7));
+          final wEnd = wStart.add(const Duration(days: 6));
           final count = provider
-              .getSessionsByDay(wStart, wEnd)
-              .values
-              .fold(0, (s, l) => s + l.where((e) => e.countsAsWorkout).length);
+              .sessionsInPeriod(wStart, wEnd)
+              .where((e) => e.countsAsWorkout)
+              .length;
           return _bar(i, count.toDouble());
         });
       case _Period.year:

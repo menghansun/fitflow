@@ -120,8 +120,10 @@ class WorkoutProvider extends ChangeNotifier {
   Map<DateTime, List<WorkoutSession>> getSessionsByDay(
       DateTime start, DateTime end) {
     final Map<DateTime, List<WorkoutSession>> result = {};
+    // Normalize to include full end day (23:59:59)
+    final endOfDay = DateTime(end.year, end.month, end.day, 23, 59, 59);
     for (final s in _sessions) {
-      if (s.date.isBefore(start) || s.date.isAfter(end)) continue;
+      if (s.date.isBefore(start) || s.date.isAfter(endOfDay)) continue;
       final day = DateTime(s.date.year, s.date.month, s.date.day);
       (result[day] ??= []).add(s);
     }

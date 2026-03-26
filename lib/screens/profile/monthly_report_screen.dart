@@ -795,7 +795,7 @@ class _MonthComparisonCard extends StatelessWidget {
               Expanded(child: _DeltaTile(
                 label: '配速',
                 delta: paceDelta,
-                positiveGood: paceBetter,
+                positiveGood: !paceBetter,
                 icon: '⚡',
                 color: const Color(0xFFFFB347),
               )),
@@ -827,13 +827,15 @@ class _DeltaTile extends StatelessWidget {
     final isPositive = delta >= 0;
     final isGood = positiveGood ? isPositive : !isPositive;
     final effectiveDelta = delta.abs();
-    final arrow = isPositive ? '↑' : '↓';
-    final deltaColor = isGood ? const Color(0xFF34C759) : const Color(0xFFFF3B30);
+    // 箭头跟着"是否变好"走：变好↑，变差↓
+    final arrow = isGood ? '↑' : '↓';
+    // 颜色反过来：变好红色，变差绿色
+    final deltaColor = isGood ? const Color(0xFFFF3B30) : const Color(0xFF34C759);
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
-        color: (isGood ? const Color(0xFF34C759) : const Color(0xFFFF3B30)).withValues(alpha: 0.08),
+        color: (isGood ? const Color(0xFFFF3B30) : const Color(0xFF34C759)).withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
