@@ -12,6 +12,9 @@ class WorkoutProvider extends ChangeNotifier {
   List<WorkoutSession> get sessions => _sessions;
   List<WorkoutSession> get recentSessions => _sessions.take(20).toList();
 
+  // 成就检查回调
+  VoidCallback? onSessionsChanged;
+
   String generateId() => _uuid.v4();
 
   /// Called by UserProvider/main when current user changes
@@ -44,6 +47,7 @@ class WorkoutProvider extends ChangeNotifier {
         ..sort((a, b) => b.date.compareTo(a.date));
     }
     notifyListeners();
+    onSessionsChanged?.call();
   }
 
   void refresh() => _reload();

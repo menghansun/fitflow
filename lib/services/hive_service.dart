@@ -1,6 +1,7 @@
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/workout_session.dart';
 import '../models/app_user.dart';
+import '../models/achievement.dart';
 
 class HiveService {
   static Future<void> init() async {
@@ -20,6 +21,7 @@ class HiveService {
     Hive.registerAdapter(GymExerciseAdapter());
     Hive.registerAdapter(WorkoutSessionAdapter());
     Hive.registerAdapter(AppUserAdapter());
+    Hive.registerAdapter(AchievementAdapter());
 
     // Only open the users box at startup;
     // per-user workout boxes are opened lazily by UserProvider.

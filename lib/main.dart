@@ -7,9 +7,11 @@ import 'services/hive_service.dart';
 import 'services/supabase_service.dart';
 import 'providers/user_provider.dart';
 import 'providers/workout_provider.dart';
+import 'providers/achievement_provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/main_screen.dart';
 import 'screens/auth/login_screen.dart';
+import 'widgets/achievement_unlock_dialog.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,6 +40,7 @@ class _FitFlowAppState extends State<FitFlowApp> {
       providers: [
         ChangeNotifierProvider(create: (_) => UserProvider()..init()),
         ChangeNotifierProvider(create: (_) => WorkoutProvider()),
+        ChangeNotifierProvider(create: (_) => AchievementProvider()),
       ],
       child: StreamBuilder(
         stream: SupabaseService.authStateChanges,
@@ -58,10 +61,26 @@ class _FitFlowAppState extends State<FitFlowApp> {
               // Logged in → load workout data
               if (userProvider.currentUser != null) {
                 final uid = userProvider.currentUser!.id;
-                WidgetsBinding.instance.addPostFrameCallback((_) {
+                WidgetsBinding.instance.addPostFrameCallback((_) async {
                   if (_loadedUserId != uid) {
                     _loadedUserId = uid;
-                    context.read<WorkoutProvider>().loadForUser(uid);
+                    await context.read<WorkoutProvider>().loadForUser(uid);
+                    if (!context.mounted) return;
+                    await context.read<AchievementProvider>().init(uid);
+                    // 设置成就检查回调
+                    context.read<WorkoutProvider>().onSessionsChanged = () async {
+                      final sessions = context.read<WorkoutProvider>().sessions;
+                      final newlyUnlocked = await context.read<AchievementProvider>().checkAndUpdateAchievements(sessions);
+                      // 显示解锁弹窗
+                      for (final achievement in newlyUnlocked) {
+                        if (context.mounted) {
+                          showAchievementUnlockDialog(context, achievement);
+                        }
+                      }
+                    };
+                    // 初始检查成就（不显示弹窗）
+                    final sessions = context.read<WorkoutProvider>().sessions;
+                    await context.read<AchievementProvider>().checkAndUpdateAchievements(sessions);
                   }
                 });
               } else if (isLoggedIn) {
@@ -73,7 +92,23 @@ class _FitFlowAppState extends State<FitFlowApp> {
                     if (_loadedUserId != newUid) {
                       _loadedUserId = newUid;
                       if (context.mounted) {
-                        context.read<WorkoutProvider>().loadForUser(newUid);
+                        await context.read<WorkoutProvider>().loadForUser(newUid);
+                        if (!context.mounted) return;
+                        await context.read<AchievementProvider>().init(newUid);
+                        // 设置成就检查回调
+                        context.read<WorkoutProvider>().onSessionsChanged = () async {
+                          final sessions = context.read<WorkoutProvider>().sessions;
+                          final newlyUnlocked = await context.read<AchievementProvider>().checkAndUpdateAchievements(sessions);
+                          // 显示解锁弹窗
+                          for (final achievement in newlyUnlocked) {
+                            if (context.mounted) {
+                              showAchievementUnlockDialog(context, achievement);
+                            }
+                          }
+                        };
+                        // 初始检查成就（不显示弹窗）
+                        final sessions = context.read<WorkoutProvider>().sessions;
+                        await context.read<AchievementProvider>().checkAndUpdateAchievements(sessions);
                       }
                     }
                   }

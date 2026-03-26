@@ -3,12 +3,14 @@ import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/workout_provider.dart';
+import '../../providers/achievement_provider.dart';
 import '../../models/app_user.dart';
 import '../../theme/app_theme.dart';
 import '../../services/export_import_service.dart';
 import '../../services/supabase_service.dart';
 import '../gym/exercise_gallery_screen.dart';
 import 'monthly_report_screen.dart';
+import 'achievement_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -112,6 +114,20 @@ class ProfileScreen extends StatelessWidget {
                     context,
                     MaterialPageRoute(
                       builder: (_) => MonthlyReportScreen(year: now.year, month: now.month, userId: user.id),
+                    ),
+                  );
+                },
+              ),
+
+              _SettingsTile(
+                icon: Icons.emoji_events_outlined,
+                title: '我的成就',
+                subtitle: '查看已解锁的成就',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AchievementScreen(),
                     ),
                   );
                 },
