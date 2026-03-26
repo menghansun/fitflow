@@ -1,8 +1,14 @@
+import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import '../../providers/workout_provider.dart';
 import '../../models/workout_session.dart';
 import '../../theme/app_theme.dart';
@@ -19,6 +25,11 @@ class _StatsScreenState extends State<StatsScreen>
   late TabController _tabCtrl;
   late DateTime _currentDate; // 当前选中的基准日期
   DateTimeRange? _dateRange; // 用户选择的日期范围
+  bool _saving = false;
+  final GlobalKey _weekKey = GlobalKey();
+  final GlobalKey _monthKey = GlobalKey();
+  final GlobalKey _yearKey = GlobalKey();
+  final GlobalKey _allKey = GlobalKey();
 
   @override
   void initState() {
@@ -71,6 +82,128 @@ class _StatsScreenState extends State<StatsScreen>
           break;
       }
     });
+  }
+
+  GlobalKey _getCurrentKey() {
+    switch (_tabCtrl.index) {
+      case 0: return _weekKey;
+      case 1: return _monthKey;
+      case 2: return _yearKey;
+      default: return _allKey;
+    }
+  }
+
+  String _getPeriodTitle() {
+    switch (_tabCtrl.index) {
+      case 0:
+        final weekNum = _getWeekNumber(_currentDate);
+        return '${_currentDate.year}年第${weekNum}周运动报告';
+      case 1:
+        return '${_currentDate.year}年${_currentDate.month}月运动报告';
+      case 2:
+        return '${_currentDate.year}年运动报告';
+      default:
+        return '全部运动报告';
+    }
+  }
+
+  Future<void> _shareCard(BuildContext ctx) async {
+    final result = await showModalBottomSheet<String>(
+      context: ctx,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(ctx).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  width: 44, height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6B5EE6).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.save_alt, color: Color(0xFF6B5EE6)),
+                ),
+                title: const Text('保存到相册'),
+                subtitle: const Text('将统计图片保存到手机相册'),
+                onTap: () => Navigator.pop(ctx, 'save'),
+              ),
+              ListTile(
+                leading: Container(
+                  width: 44, height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00D4FF).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.share, color: Color(0xFF00D4FF)),
+                ),
+                title: const Text('分享图片'),
+                subtitle: const Text('通过微信、QQ等分享图片'),
+                onTap: () => Navigator.pop(ctx, 'share'),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (result == null || !mounted) return;
+
+    setState(() => _saving = true);
+
+    try {
+      final boundary = _getCurrentKey().currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('生成图片失败')));
+        return;
+      }
+
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('生成图片失败')));
+        return;
+      }
+
+      final tempDir = await getTemporaryDirectory();
+      final fileName = 'FitFlow_${DateTime.now().millisecondsSinceEpoch}.png';
+      final file = File('${tempDir.path}/$fileName');
+      await file.writeAsBytes(byteData.buffer.asUint8List());
+
+      if (!mounted) return;
+
+      if (result == 'save') {
+        final saveResult = await ImageGallerySaverPlus.saveFile(file.path, name: fileName);
+        if (mounted) {
+          if (saveResult['isSuccess'] == true) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已保存到相册')));
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('保存失败，请检查相册权限')));
+          }
+        }
+      } else {
+        await Share.shareXFiles([XFile(file.path)], text: _getPeriodTitle());
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('操作失败: $e')));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   String _getPeriodLabel() {
@@ -158,6 +291,18 @@ class _StatsScreenState extends State<StatsScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('运动统计'),
+        actions: [
+          _saving
+              ? const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                )
+              : IconButton(
+                  icon: const Icon(Icons.share),
+                  onPressed: () => _shareCard(context),
+                ),
+          const SizedBox(width: 4),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(50),
           child: Column(
@@ -181,10 +326,10 @@ class _StatsScreenState extends State<StatsScreen>
       body: TabBarView(
         controller: _tabCtrl,
         children: [
-          _StatsPeriodBuilder(currentDate: _currentDate, period: _Period.week, customRange: _dateRange, onMonthTap: () {}, onWeekTap: () => _showPeriodPicker(context), onYearTap: () {}),
-          _StatsPeriodBuilder(currentDate: _currentDate, period: _Period.month, customRange: _dateRange, onMonthTap: () => _showPeriodPicker(context), onWeekTap: () {}, onYearTap: () {}),
-          _StatsPeriodBuilder(currentDate: _currentDate, period: _Period.year, customRange: _dateRange, onMonthTap: () {}, onWeekTap: () {}, onYearTap: () => _showPeriodPicker(context)),
-          _StatsPeriodBuilder(currentDate: _currentDate, period: _Period.all, customRange: _dateRange, onMonthTap: () {}, onWeekTap: () {}, onYearTap: () {}),
+          RepaintBoundary(key: _weekKey, child: _StatsPeriodBuilder(currentDate: _currentDate, period: _Period.week, customRange: _dateRange, onMonthTap: () {}, onWeekTap: () => _showPeriodPicker(context), onYearTap: () {})),
+          RepaintBoundary(key: _monthKey, child: _StatsPeriodBuilder(currentDate: _currentDate, period: _Period.month, customRange: _dateRange, onMonthTap: () => _showPeriodPicker(context), onWeekTap: () {}, onYearTap: () {})),
+          RepaintBoundary(key: _yearKey, child: _StatsPeriodBuilder(currentDate: _currentDate, period: _Period.year, customRange: _dateRange, onMonthTap: () {}, onWeekTap: () {}, onYearTap: () => _showPeriodPicker(context))),
+          RepaintBoundary(key: _allKey, child: _StatsPeriodBuilder(currentDate: _currentDate, period: _Period.all, customRange: _dateRange, onMonthTap: () {}, onWeekTap: () {}, onYearTap: () {})),
         ],
       ),
     );
@@ -395,18 +540,18 @@ class _MonthStatsView extends StatelessWidget {
                                 label: '总训练',
                                 value: '${sessions.length}',
                                 unit: '次',
-                                color: const Color(0xFF8B7CF6),
+                                color: const Color(0xFFB4A0FF),
                                 valueColor: const Color(0xFF6B5EE6),
-                                bgColor: isDark ? const Color(0xFF2D3566) : const Color(0xFFF3F0FF),
+                                bgColor: isDark ? const Color(0xFF2D3566) : const Color(0xFFF0EBFF),
                               )),
                               const SizedBox(width: 12),
                               Expanded(child: _MonthStatTile(
                                 label: '总时长',
                                 value: '$totalMins',
                                 unit: '分钟',
-                                color: const Color(0xFFFF8FA3),
-                                valueColor: const Color(0xFFE87A8A),
-                                bgColor: isDark ? const Color(0xFF4A2D35) : const Color(0xFFFFF0F3),
+                                color: const Color(0xFFFF7096),
+                                valueColor: const Color(0xFFFF4070),
+                                bgColor: isDark ? const Color(0xFF4A2D35) : const Color(0xFFFFF0F4),
                               )),
                             ],
                           ),
@@ -417,8 +562,8 @@ class _MonthStatsView extends StatelessWidget {
                                 label: '最爱的运动',
                                 value: topType,
                                 unit: '',
-                                color: const Color(0xFF52C9A4),
-                                valueColor: const Color(0xFF3DB590),
+                                color: AppColors.cardioAccent,
+                                valueColor: const Color(0xFF10B880),
                                 bgColor: isDark ? const Color(0xFF1D3D2E) : const Color(0xFFE8FBF3),
                               )),
                               const SizedBox(width: 12),
@@ -426,9 +571,9 @@ class _MonthStatsView extends StatelessWidget {
                                 label: '累计消耗热量',
                                 value: '$totalCals',
                                 unit: '千卡',
-                                color: const Color(0xFFFFB347),
-                                valueColor: const Color(0xFFE09A30),
-                                bgColor: isDark ? const Color(0xFF4A3D1D) : const Color(0xFFFFF8E8),
+                                color: const Color(0xFFFF9F40),
+                                valueColor: const Color(0xFFFF8000),
+                                bgColor: isDark ? const Color(0xFF4A3D1D) : const Color(0xFFFFF4E6),
                               )),
                             ],
                           ),
@@ -636,18 +781,18 @@ class _WeekStatsView extends StatelessWidget {
                                 label: '总训练',
                                 value: '${sessions.length}',
                                 unit: '次',
-                                color: const Color(0xFF8B7CF6),
+                                color: const Color(0xFFB4A0FF),
                                 valueColor: const Color(0xFF6B5EE6),
-                                bgColor: isDark ? const Color(0xFF2D3566) : const Color(0xFFF3F0FF),
+                                bgColor: isDark ? const Color(0xFF2D3566) : const Color(0xFFF0EBFF),
                               )),
                               const SizedBox(width: 12),
                               Expanded(child: _MonthStatTile(
                                 label: '总时长',
                                 value: '$totalMins',
                                 unit: '分钟',
-                                color: const Color(0xFFFF8FA3),
-                                valueColor: const Color(0xFFE87A8A),
-                                bgColor: isDark ? const Color(0xFF4A2D35) : const Color(0xFFFFF0F3),
+                                color: const Color(0xFFFF7096),
+                                valueColor: const Color(0xFFFF4070),
+                                bgColor: isDark ? const Color(0xFF4A2D35) : const Color(0xFFFFF0F4),
                               )),
                             ],
                           ),
@@ -658,8 +803,8 @@ class _WeekStatsView extends StatelessWidget {
                                 label: '最爱的运动',
                                 value: topType,
                                 unit: '',
-                                color: const Color(0xFF52C9A4),
-                                valueColor: const Color(0xFF3DB590),
+                                color: AppColors.cardioAccent,
+                                valueColor: const Color(0xFF10B880),
                                 bgColor: isDark ? const Color(0xFF1D3D2E) : const Color(0xFFE8FBF3),
                               )),
                               const SizedBox(width: 12),
@@ -667,9 +812,9 @@ class _WeekStatsView extends StatelessWidget {
                                 label: '累计消耗热量',
                                 value: '$totalCals',
                                 unit: '千卡',
-                                color: const Color(0xFFFFB347),
-                                valueColor: const Color(0xFFE09A30),
-                                bgColor: isDark ? const Color(0xFF4A3D1D) : const Color(0xFFFFF8E8),
+                                color: const Color(0xFFFF9F40),
+                                valueColor: const Color(0xFFFF8000),
+                                bgColor: isDark ? const Color(0xFF4A3D1D) : const Color(0xFFFFF4E6),
                               )),
                             ],
                           ),
@@ -885,18 +1030,18 @@ class _YearStatsView extends StatelessWidget {
                                 label: '总训练',
                                 value: '${sessions.length}',
                                 unit: '次',
-                                color: const Color(0xFF8B7CF6),
+                                color: const Color(0xFFB4A0FF),
                                 valueColor: const Color(0xFF6B5EE6),
-                                bgColor: isDark ? const Color(0xFF2D3566) : const Color(0xFFF3F0FF),
+                                bgColor: isDark ? const Color(0xFF2D3566) : const Color(0xFFF0EBFF),
                               )),
                               const SizedBox(width: 12),
                               Expanded(child: _MonthStatTile(
                                 label: '总时长',
                                 value: '$totalMins',
                                 unit: '分钟',
-                                color: const Color(0xFFFF8FA3),
-                                valueColor: const Color(0xFFE87A8A),
-                                bgColor: isDark ? const Color(0xFF4A2D35) : const Color(0xFFFFF0F3),
+                                color: const Color(0xFFFF7096),
+                                valueColor: const Color(0xFFFF4070),
+                                bgColor: isDark ? const Color(0xFF4A2D35) : const Color(0xFFFFF0F4),
                               )),
                             ],
                           ),
@@ -907,8 +1052,8 @@ class _YearStatsView extends StatelessWidget {
                                 label: '最爱的运动',
                                 value: topType,
                                 unit: '',
-                                color: const Color(0xFF52C9A4),
-                                valueColor: const Color(0xFF3DB590),
+                                color: AppColors.cardioAccent,
+                                valueColor: const Color(0xFF10B880),
                                 bgColor: isDark ? const Color(0xFF1D3D2E) : const Color(0xFFE8FBF3),
                               )),
                               const SizedBox(width: 12),
@@ -916,9 +1061,9 @@ class _YearStatsView extends StatelessWidget {
                                 label: '累计消耗热量',
                                 value: '$totalCals',
                                 unit: '千卡',
-                                color: const Color(0xFFFFB347),
-                                valueColor: const Color(0xFFE09A30),
-                                bgColor: isDark ? const Color(0xFF4A3D1D) : const Color(0xFFFFF8E8),
+                                color: const Color(0xFFFF9F40),
+                                valueColor: const Color(0xFFFF8000),
+                                bgColor: isDark ? const Color(0xFF4A3D1D) : const Color(0xFFFFF4E6),
                               )),
                             ],
                           ),
@@ -1632,7 +1777,7 @@ class _WorkoutTypeTile extends StatelessWidget {
           Text(
             value,
             style: const TextStyle(
-              color: Color(0xFF5A4BD4),
+              color: Color(0xFF7B6EF6),
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
@@ -2737,26 +2882,35 @@ class _YearPickerDialogState extends State<_YearPickerDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+
     return AlertDialog(
       title: const Text('选择年份'),
       content: SizedBox(
         height: 200,
-        width: 100,
+        width: 120,
         child: ListWheelScrollView.useDelegate(
           controller: _scrollCtrl,
           itemExtent: 50,
           physics: const FixedExtentScrollPhysics(),
-          onSelectedItemChanged: (idx) => _selectedYear = 2020 + idx,
+          onSelectedItemChanged: (idx) => setState(() => _selectedYear = 2020 + idx),
           childDelegate: ListWheelChildBuilderDelegate(
             childCount: DateTime.now().year - 2020 + 1,
             builder: (context, idx) {
               final year = 2020 + idx;
-              return Center(
+              final isSelected = _selectedYear == year;
+              return Container(
+                decoration: BoxDecoration(
+                  color: isSelected ? primary.withValues(alpha: 0.15) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                alignment: Alignment.center,
                 child: Text(
                   '$year',
                   style: TextStyle(
                     fontSize: 20,
-                    fontWeight: _selectedYear == year ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    color: isSelected ? primary : null,
                   ),
                 ),
               );
@@ -2810,11 +2964,13 @@ class _MonthPickerDialogState extends State<_MonthPickerDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+
     return AlertDialog(
       title: const Text('选择年月'),
       content: SizedBox(
         height: 200,
-        width: 200,
+        width: 240,
         child: Row(
           children: [
             Expanded(
@@ -2822,17 +2978,24 @@ class _MonthPickerDialogState extends State<_MonthPickerDialog> {
                 controller: _yearCtrl,
                 itemExtent: 40,
                 physics: const FixedExtentScrollPhysics(),
-                onSelectedItemChanged: (idx) => _selectedYear = 2020 + idx,
+                onSelectedItemChanged: (idx) => setState(() => _selectedYear = 2020 + idx),
                 childDelegate: ListWheelChildBuilderDelegate(
                   childCount: DateTime.now().year - 2020 + 1,
                   builder: (context, idx) {
                     final year = 2020 + idx;
-                    return Center(
+                    final isSelected = _selectedYear == year;
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: isSelected ? primary.withValues(alpha: 0.15) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      alignment: Alignment.center,
                       child: Text(
                         '$year年',
                         style: TextStyle(
                           fontSize: 16,
-                          fontWeight: _selectedYear == year ? FontWeight.bold : FontWeight.normal,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          color: isSelected ? primary : null,
                         ),
                       ),
                     );
@@ -2845,17 +3008,24 @@ class _MonthPickerDialogState extends State<_MonthPickerDialog> {
                 controller: _monthCtrl,
                 itemExtent: 40,
                 physics: const FixedExtentScrollPhysics(),
-                onSelectedItemChanged: (idx) => _selectedMonth = idx + 1,
+                onSelectedItemChanged: (idx) => setState(() => _selectedMonth = idx + 1),
                 childDelegate: ListWheelChildBuilderDelegate(
                   childCount: 12,
                   builder: (context, idx) {
                     final month = idx + 1;
-                    return Center(
+                    final isSelected = _selectedMonth == month;
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: isSelected ? primary.withValues(alpha: 0.15) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      alignment: Alignment.center,
                       child: Text(
                         '${month}月',
                         style: TextStyle(
                           fontSize: 16,
-                          fontWeight: _selectedMonth == month ? FontWeight.bold : FontWeight.normal,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          color: isSelected ? primary : null,
                         ),
                       ),
                     );

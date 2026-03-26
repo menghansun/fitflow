@@ -1,7 +1,13 @@
+import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import '../../models/workout_session.dart';
 import '../../providers/workout_provider.dart';
 
@@ -25,6 +31,8 @@ class MonthlyReportScreen extends StatefulWidget {
 class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
   List<WorkoutSession> _swimSessions = [];
   bool _loading = true;
+  bool _saving = false;
+  final GlobalKey _repaintKey = GlobalKey();
 
   @override
   void initState() {
@@ -58,14 +66,106 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
   }
 
   Future<void> _shareCard() async {
-    final totalDist = _swimSessions.fold<int>(0, (sum, s) => sum + (s.totalDistanceMeters ?? 0));
-    await Clipboard.setData(ClipboardData(
-      text: 'FitFlow ${widget.year}年${widget.month}月游泳报告 🏊 ${_swimSessions.length}次训练 · ${(totalDist / 1000).toStringAsFixed(1)}公里',
-    ));
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('报告已复制到剪贴板')),
-      );
+    if (_swimSessions.isEmpty) return;
+
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00D4FF).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.save_alt, color: Color(0xFF00D4FF)),
+                ),
+                title: const Text('保存到相册'),
+                subtitle: const Text('将报告图片保存到手机相册'),
+                onTap: () => Navigator.pop(ctx, 'save'),
+              ),
+              ListTile(
+                leading: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6B5EE6).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.share, color: Color(0xFF6B5EE6)),
+                ),
+                title: const Text('分享图片'),
+                subtitle: const Text('通过微信、QQ等分享报告图片'),
+                onTap: () => Navigator.pop(ctx, 'share'),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (result == null || !mounted) return;
+
+    setState(() => _saving = true);
+
+    try {
+      final boundary = _repaintKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('生成图片失败')));
+        return;
+      }
+
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('生成图片失败')));
+        return;
+      }
+
+      final tempDir = await getTemporaryDirectory();
+      final fileName = 'FitFlow_${widget.year}${widget.month.toString().padLeft(2, '0')}_report.png';
+      final file = File('${tempDir.path}/$fileName');
+      await file.writeAsBytes(byteData.buffer.asUint8List());
+
+      if (!mounted) return;
+
+      if (result == 'save') {
+        final saveResult = await ImageGallerySaverPlus.saveFile(file.path, name: fileName);
+        if (mounted) {
+          if (saveResult['isSuccess'] == true) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已保存到相册')));
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('保存失败，请检查相册权限')));
+          }
+        }
+      } else {
+        await Share.shareXFiles([XFile(file.path)], text: 'FitFlow ${widget.year}年${widget.month}月游泳报告 🏊');
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('操作失败: $e')));
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -89,10 +189,15 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
         )),
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.share, color: Color(0xFF3D3D3D)),
-            onPressed: _swimSessions.isEmpty ? null : _shareCard,
-          ),
+          _saving
+              ? const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                )
+              : IconButton(
+                  icon: const Icon(Icons.share, color: Color(0xFF3D3D3D)),
+                  onPressed: _swimSessions.isEmpty ? null : _shareCard,
+                ),
         ],
       ),
       body: _loading
@@ -101,10 +206,13 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
               ? _EmptyState(monthName: monthName)
               : SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
-                  child: _SwimReportContent(
-                    sessions: _swimSessions,
-                    year: widget.year,
-                    month: widget.month,
+                  child: RepaintBoundary(
+                    key: _repaintKey,
+                    child: _SwimReportContent(
+                      sessions: _swimSessions,
+                      year: widget.year,
+                      month: widget.month,
+                    ),
                   ),
                 ),
     );
