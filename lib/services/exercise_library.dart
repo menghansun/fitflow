@@ -807,6 +807,7 @@ class ExerciseLibrary {
       ],
       imageAsset: 'assets/exercises/romanian_deadlift.gif',
       muscleAsset: 'assets/muscles/glute_bridge.png',
+      videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-bodyweight-glute-bridge-side.mp4',
     ),
     ExerciseMeta(
       name: '杠铃臀推',
@@ -831,6 +832,7 @@ class ExerciseLibrary {
       ],
       imageAsset: 'assets/exercises/romanian_deadlift.gif',
       muscleAsset: 'assets/muscles/hip_thrust.png',
+      videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-barbell-hip-thrust-side.mp4',
     ),
     ExerciseMeta(
       name: '保加利亚深蹲（臀部主导）',
@@ -854,7 +856,8 @@ class ExerciseLibrary {
       '起身时想象用臀部把身体顶起来',
       ],
       imageAsset: 'assets/exercises/romanian_deadlift.gif',
-      muscleAsset: 'assets/muscles/bulgarian_split_glute.png',
+      muscleAsset: 'assets/muscles/bulgarian_squat.png',
+      videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-bodyweight-bulgarian-split-squat-side.mp4',
     ),
     ExerciseMeta(
       name: '罗马尼亚硬拉（臀部主导）',
@@ -902,7 +905,8 @@ class ExerciseLibrary {
       '顶峰停顿一下，再控制回到起点',
       ],
       imageAsset: 'assets/exercises/face_pull.gif',
-      muscleAsset: 'assets/muscles/cable_kickback.png',
+      muscleAsset: 'assets/muscles/donkey_kick.png',
+      videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-cables-cable-kickback-side.mp4',
     ),
     ExerciseMeta(
       name: '蚌式开合',
@@ -926,6 +930,7 @@ class ExerciseLibrary {
       ],
       imageAsset: 'assets/exercises/plank.gif',
       muscleAsset: 'assets/muscles/clamshell.png',
+      videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-band-clamshell-side.mp4',
     ),
     ExerciseMeta(
       name: '卷腹',
