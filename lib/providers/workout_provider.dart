@@ -87,18 +87,17 @@ class WorkoutProvider extends ChangeNotifier {
     final box = _box;
     if (box == null) return;
 
-    int merged = 0;
     for (final cloud in cloudSessions) {
       final local = box.get(cloud.id);
       if (local == null) {
         // Cloud only
         await box.put(cloud.id, cloud);
-        merged++;
       }
       // If cloud is newer (by date), overwrite local — simplified: cloud always wins
       await box.put(cloud.id, cloud);
     }
-    if (merged > 0) _reload();
+    // Always reload after cloud sync so achievement unlockedAt can be backfilled
+    if (cloudSessions.isNotEmpty) _reload();
   }
 
   // ── Query helpers ──────────────────────────────────────

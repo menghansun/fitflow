@@ -44,34 +44,41 @@ class AchievementProvider extends ChangeNotifier {
     final swimSessions = sessions.where((s) => s.type == WorkoutType.swim && s.countsAsWorkout).toList();
     final gymSessions = sessions.where((s) => s.type == WorkoutType.gym && s.countsAsWorkout).toList();
     final allWorkouts = sessions.where((s) => s.countsAsWorkout).toList();
+    final sessionsAsc = [...sessions]..sort((a, b) => a.date.compareTo(b.date));
+
+    Future<void> update(AchievementType type, int currentValue) async {
+      final unlockedAt = _findUnlockedAt(type, sessionsAsc);
+      final result = await _updateAchievement(type, currentValue, unlockedAt: unlockedAt);
+      if (result != null) newlyUnlocked.add(result);
+    }
 
     // 游泳次数成就
-    final r1 = await _updateAchievement(AchievementType.swimFirst, swimSessions.length); if (r1 != null) newlyUnlocked.add(r1);
-    final r2 = await _updateAchievement(AchievementType.swim10, swimSessions.length); if (r2 != null) newlyUnlocked.add(r2);
-    final r3 = await _updateAchievement(AchievementType.swim50, swimSessions.length); if (r3 != null) newlyUnlocked.add(r3);
-    final r4 = await _updateAchievement(AchievementType.swim100, swimSessions.length); if (r4 != null) newlyUnlocked.add(r4);
+    await update(AchievementType.swimFirst, swimSessions.length);
+    await update(AchievementType.swim10, swimSessions.length);
+    await update(AchievementType.swim50, swimSessions.length);
+    await update(AchievementType.swim100, swimSessions.length);
 
     // 游泳距离成就
     final totalSwimDist = swimSessions.fold<int>(0, (sum, s) => sum + (s.totalDistanceMeters ?? 0));
     final swimDistKm = totalSwimDist ~/ 1000;
-    final r5 = await _updateAchievement(AchievementType.swimDistance10, swimDistKm); if (r5 != null) newlyUnlocked.add(r5);
-    final r6 = await _updateAchievement(AchievementType.swimDistance50, swimDistKm); if (r6 != null) newlyUnlocked.add(r6);
-    final r7 = await _updateAchievement(AchievementType.swimDistance100, swimDistKm); if (r7 != null) newlyUnlocked.add(r7);
+    await update(AchievementType.swimDistance10, swimDistKm);
+    await update(AchievementType.swimDistance50, swimDistKm);
+    await update(AchievementType.swimDistance100, swimDistKm);
 
     // 健身成就
-    final r8 = await _updateAchievement(AchievementType.gymFirst, gymSessions.length); if (r8 != null) newlyUnlocked.add(r8);
-    final r9 = await _updateAchievement(AchievementType.gym10, gymSessions.length); if (r9 != null) newlyUnlocked.add(r9);
-    final r10 = await _updateAchievement(AchievementType.gym50, gymSessions.length); if (r10 != null) newlyUnlocked.add(r10);
+    await update(AchievementType.gymFirst, gymSessions.length);
+    await update(AchievementType.gym10, gymSessions.length);
+    await update(AchievementType.gym50, gymSessions.length);
 
     // 连续运动成就
     final streak = _calculateStreak(allWorkouts);
-    final r11 = await _updateAchievement(AchievementType.streak3, streak); if (r11 != null) newlyUnlocked.add(r11);
-    final r12 = await _updateAchievement(AchievementType.streak7, streak); if (r12 != null) newlyUnlocked.add(r12);
-    final r13 = await _updateAchievement(AchievementType.streak30, streak); if (r13 != null) newlyUnlocked.add(r13);
+    await update(AchievementType.streak3, streak);
+    await update(AchievementType.streak7, streak);
+    await update(AchievementType.streak30, streak);
 
     // 躺平成就 - 连续不运动
     final lazyDays = _calculateLazyDays(allWorkouts);
-    final rLazy = await _updateAchievement(AchievementType.lazy3, lazyDays); if (rLazy != null) newlyUnlocked.add(rLazy);
+    await update(AchievementType.lazy3, lazyDays);
 
     // 月度成就
     final now = DateTime.now();
@@ -79,27 +86,27 @@ class AchievementProvider extends ChangeNotifier {
         s.date.year == now.year && s.date.month == now.month).length;
     final thisMonthWorkouts = allWorkouts.where((s) =>
         s.date.year == now.year && s.date.month == now.month).length;
-    final r14 = await _updateAchievement(AchievementType.monthlySwim5, thisMonthSwims); if (r14 != null) newlyUnlocked.add(r14);
-    final r15 = await _updateAchievement(AchievementType.monthlyWorkout10, thisMonthWorkouts); if (r15 != null) newlyUnlocked.add(r15);
+    await update(AchievementType.monthlySwim5, thisMonthSwims);
+    await update(AchievementType.monthlyWorkout10, thisMonthWorkouts);
 
     // 热量成就 - 单次消耗
     final maxSingleCalorie = sessions.fold<int>(0, (max, s) {
       final cal = s.calories ?? 0;
       return cal > max ? cal : max;
     });
-    final r16 = await _updateAchievement(AchievementType.burn100, maxSingleCalorie); if (r16 != null) newlyUnlocked.add(r16);
+    await update(AchievementType.burn100, maxSingleCalorie);
 
     // 热量成就 - 累计消耗
     final totalCalorie = sessions.fold<int>(0, (sum, s) => sum + (s.calories ?? 0));
-    final r17 = await _updateAchievement(AchievementType.calorie1000, totalCalorie ~/ 100); if (r17 != null) newlyUnlocked.add(r17);
+    await update(AchievementType.calorie1000, totalCalorie ~/ 100);
 
     // 时长成就 - 单次最长时间
     final maxSingleDuration = sessions.fold<int>(0, (max, s) {
       final dur = s.durationInMinutes;
       return dur > max ? dur : max;
     });
-    final r18 = await _updateAchievement(AchievementType.endurance30, maxSingleDuration); if (r18 != null) newlyUnlocked.add(r18);
-    final r19 = await _updateAchievement(AchievementType.ironMan, maxSingleDuration); if (r19 != null) newlyUnlocked.add(r19);
+    await update(AchievementType.endurance30, maxSingleDuration);
+    await update(AchievementType.ironMan, maxSingleDuration);
 
     // 部位成就 - 腹部(core)、腿部(legs)、上肢(arms/shoulders/chest)
     int coreCount = 0;
@@ -128,16 +135,16 @@ class AchievementProvider extends ChangeNotifier {
         }
       }
     }
-    final r20 = await _updateAchievement(AchievementType.core10, coreCount); if (r20 != null) newlyUnlocked.add(r20);
-    final r21 = await _updateAchievement(AchievementType.legs10, legsCount); if (r21 != null) newlyUnlocked.add(r21);
-    final r22 = await _updateAchievement(AchievementType.upperBody10, upperBodyCount); if (r22 != null) newlyUnlocked.add(r22);
+    await update(AchievementType.core10, coreCount);
+    await update(AchievementType.legs10, legsCount);
+    await update(AchievementType.upperBody10, upperBodyCount);
 
     // 全能成就 - 完成5种不同类型运动
     final workoutTypes = <WorkoutType>{};
     for (final session in allWorkouts) {
       workoutTypes.add(session.type);
     }
-    final r23 = await _updateAchievement(AchievementType.allRounder, workoutTypes.length); if (r23 != null) newlyUnlocked.add(r23);
+    await update(AchievementType.allRounder, workoutTypes.length);
 
     // 自由泳解锁
     bool hasFreestyle = false;
@@ -152,25 +159,245 @@ class AchievementProvider extends ChangeNotifier {
       }
       if (hasFreestyle) break;
     }
-    final r24 = await _updateAchievement(AchievementType.freestyleUnlocked, hasFreestyle ? 1 : 0); if (r24 != null) newlyUnlocked.add(r24);
+    await update(AchievementType.freestyleUnlocked, hasFreestyle ? 1 : 0);
 
     return newlyUnlocked;
   }
 
-  Future<Achievement?> _updateAchievement(AchievementType type, int currentValue) async {
+  Future<Achievement?> _updateAchievement(
+    AchievementType type,
+    int currentValue, {
+    DateTime? unlockedAt,
+  }) async {
     final achievement = _box.get(type.name) ?? _createDefault(type);
     achievement.currentValue = currentValue;
 
     bool newlyUnlocked = false;
     if (!achievement.unlocked && currentValue >= achievement.targetValue) {
       achievement.unlocked = true;
-      achievement.unlockedAt = DateTime.now();
+      achievement.unlockedAt = unlockedAt ?? DateTime.now();
       newlyUnlocked = true;
+    } else if (achievement.unlocked && unlockedAt != null) {
+      final existing = achievement.unlockedAt;
+      if (existing == null || unlockedAt.isBefore(existing)) {
+        achievement.unlockedAt = unlockedAt;
+      }
     }
 
     await _box.put(type.name, achievement);
     notifyListeners();
     return newlyUnlocked ? achievement : null;
+  }
+
+  DateTime? _findUnlockedAt(AchievementType type, List<WorkoutSession> sessionsAsc) {
+    switch (type) {
+      case AchievementType.swimFirst:
+      case AchievementType.swim10:
+      case AchievementType.swim50:
+      case AchievementType.swim100:
+        return _findNthWorkoutDate(
+          sessionsAsc,
+          workoutType: WorkoutType.swim,
+          targetCount: Achievement(typeString: type.name).targetValue,
+        );
+      case AchievementType.swimDistance10:
+      case AchievementType.swimDistance50:
+      case AchievementType.swimDistance100:
+        return _findSwimDistanceDate(
+          sessionsAsc,
+          Achievement(typeString: type.name).targetValue * 1000,
+        );
+      case AchievementType.gymFirst:
+      case AchievementType.gym10:
+      case AchievementType.gym50:
+        return _findNthWorkoutDate(
+          sessionsAsc,
+          workoutType: WorkoutType.gym,
+          targetCount: Achievement(typeString: type.name).targetValue,
+        );
+      case AchievementType.streak3:
+        return _findStreakDate(sessionsAsc, 3);
+      case AchievementType.streak7:
+        return _findStreakDate(sessionsAsc, 7);
+      case AchievementType.streak30:
+        return _findStreakDate(sessionsAsc, 30);
+      case AchievementType.lazy3:
+        return _findLazyDate(sessionsAsc, 3);
+      case AchievementType.monthlySwim5:
+        return _findMonthlyCountDate(sessionsAsc, targetCount: 5, swimOnly: true);
+      case AchievementType.monthlyWorkout10:
+        return _findMonthlyCountDate(sessionsAsc, targetCount: 10, swimOnly: false);
+      case AchievementType.burn100:
+        return _findSingleSessionDate(sessionsAsc, (s) => (s.calories ?? 0) >= 100);
+      case AchievementType.calorie1000:
+        return _findCumulativeDate(sessionsAsc, (s) => s.calories ?? 0, 1000);
+      case AchievementType.endurance30:
+        return _findSingleSessionDate(sessionsAsc, (s) => s.durationInMinutes >= 30);
+      case AchievementType.ironMan:
+        return _findSingleSessionDate(sessionsAsc, (s) => s.durationInMinutes >= 60);
+      case AchievementType.core10:
+        return _findMuscleCountDate(sessionsAsc, {
+          MuscleGroup.core,
+        }, 10);
+      case AchievementType.legs10:
+        return _findMuscleCountDate(sessionsAsc, {
+          MuscleGroup.legs,
+          MuscleGroup.glutes,
+        }, 10);
+      case AchievementType.upperBody10:
+        return _findMuscleCountDate(sessionsAsc, {
+          MuscleGroup.arms,
+          MuscleGroup.shoulders,
+          MuscleGroup.chest,
+        }, 10);
+      case AchievementType.allRounder:
+        return _findAllRounderDate(sessionsAsc, 5);
+      case AchievementType.freestyleUnlocked:
+        return _findSingleSessionDate(sessionsAsc, (s) {
+          final sets = s.swimSets;
+          if (s.type != WorkoutType.swim || !s.countsAsWorkout || sets == null) return false;
+          return sets.any((set) => set.style == SwimStyle.freestyle);
+        });
+    }
+  }
+
+  DateTime? _findNthWorkoutDate(
+    List<WorkoutSession> sessionsAsc, {
+    required WorkoutType workoutType,
+    required int targetCount,
+  }) {
+    int count = 0;
+    for (final session in sessionsAsc) {
+      if (session.type != workoutType || !session.countsAsWorkout) continue;
+      count++;
+      if (count >= targetCount) return session.date;
+    }
+    return null;
+  }
+
+  DateTime? _findSwimDistanceDate(List<WorkoutSession> sessionsAsc, int targetMeters) {
+    int totalMeters = 0;
+    for (final session in sessionsAsc) {
+      if (session.type != WorkoutType.swim || !session.countsAsWorkout) continue;
+      totalMeters += session.totalDistanceMeters ?? 0;
+      if (totalMeters >= targetMeters) return session.date;
+    }
+    return null;
+  }
+
+  DateTime? _findSingleSessionDate(List<WorkoutSession> sessionsAsc, bool Function(WorkoutSession session) test) {
+    for (final session in sessionsAsc) {
+      if (!session.countsAsWorkout) continue;
+      if (test(session)) return session.date;
+    }
+    return null;
+  }
+
+  DateTime? _findCumulativeDate(
+    List<WorkoutSession> sessionsAsc,
+    int Function(WorkoutSession session) valueOf,
+    int targetValue,
+  ) {
+    int total = 0;
+    for (final session in sessionsAsc) {
+      if (!session.countsAsWorkout) continue;
+      total += valueOf(session);
+      if (total >= targetValue) return session.date;
+    }
+    return null;
+  }
+
+  DateTime? _findMuscleCountDate(
+    List<WorkoutSession> sessionsAsc,
+    Set<MuscleGroup> groups,
+    int targetCount,
+  ) {
+    int count = 0;
+    for (final session in sessionsAsc) {
+      if (session.type != WorkoutType.gym || !session.countsAsWorkout) continue;
+      final exercises = session.exercises;
+      if (exercises == null) continue;
+      for (final exercise in exercises) {
+        if (groups.contains(exercise.muscleGroup)) {
+          count++;
+          if (count >= targetCount) return session.date;
+        }
+      }
+    }
+    return null;
+  }
+
+  DateTime? _findAllRounderDate(List<WorkoutSession> sessionsAsc, int targetTypeCount) {
+    final seen = <WorkoutType>{};
+    for (final session in sessionsAsc) {
+      if (!session.countsAsWorkout) continue;
+      seen.add(session.type);
+      if (seen.length >= targetTypeCount) return session.date;
+    }
+    return null;
+  }
+
+  DateTime? _findMonthlyCountDate(
+    List<WorkoutSession> sessionsAsc, {
+    required int targetCount,
+    required bool swimOnly,
+  }) {
+    final monthCounts = <String, int>{};
+    for (final session in sessionsAsc) {
+      if (!session.countsAsWorkout) continue;
+      if (swimOnly && session.type != WorkoutType.swim) continue;
+      final key = '${session.date.year}-${session.date.month}';
+      final nextCount = (monthCounts[key] ?? 0) + 1;
+      monthCounts[key] = nextCount;
+      if (nextCount >= targetCount) return session.date;
+    }
+    return null;
+  }
+
+  DateTime? _findStreakDate(List<WorkoutSession> sessionsAsc, int targetDays) {
+    final workoutDates = sessionsAsc
+        .where((s) => s.countsAsWorkout)
+        .map((s) => DateTime(s.date.year, s.date.month, s.date.day))
+        .toSet()
+        .toList()
+      ..sort();
+
+    int streak = 0;
+    DateTime? previous;
+    for (final date in workoutDates) {
+      if (previous == null) {
+        streak = 1;
+      } else {
+        final diff = date.difference(previous).inDays;
+        if (diff == 1) {
+          streak++;
+        } else if (diff > 1) {
+          streak = 1;
+        }
+      }
+      if (streak >= targetDays) return date;
+      previous = date;
+    }
+    return null;
+  }
+
+  DateTime? _findLazyDate(List<WorkoutSession> sessionsAsc, int targetDays) {
+    final workoutDates = sessionsAsc
+        .where((s) => s.countsAsWorkout)
+        .map((s) => DateTime(s.date.year, s.date.month, s.date.day))
+        .toSet()
+        .toList()
+      ..sort();
+
+    for (int i = 0; i < workoutDates.length - 1; i++) {
+      final current = workoutDates[i];
+      final next = workoutDates[i + 1];
+      final gap = next.difference(current).inDays;
+      if (gap > targetDays) {
+        return current.add(Duration(days: targetDays));
+      }
+    }
+    return null;
   }
 
   int _calculateStreak(List<WorkoutSession> sessions) {
