@@ -361,7 +361,7 @@ class ExerciseLibrary {
       '拇指朝上或中立',
       '控制离心下放',
       ],
-      imageAsset: 'assets/exercises/lateral_raise.gif',
+      imageAsset: 'assets/exercises/front_raise.png',
       muscleAsset: 'assets/muscles/front_raise.png',
     ),
     ExerciseMeta(
@@ -455,7 +455,7 @@ class ExerciseLibrary {
       '顶峰保持1秒',
       '慢下控制',
       ],
-      imageAsset: 'assets/exercises/arnold_press.gif',
+      imageAsset: 'assets/exercises/barbell_shoulder_press.png',
       muscleAsset: 'assets/muscles/shrug.png',
     ),
     ExerciseMeta(
@@ -1190,7 +1190,7 @@ class ExerciseLibrary {
       '腿与地面呈90度',
       '腰部紧贴地面',
       ],
-      imageAsset: 'assets/exercises/plank.gif',
+      imageAsset: 'assets/exercises/bicycle_crunch.gif',
       muscleAsset: 'assets/muscles/dead_bug.png',
     ),
     ExerciseMeta(
@@ -1214,7 +1214,7 @@ class ExerciseLibrary {
       '收紧核心',
       '保持身体平衡',
       ],
-      imageAsset: 'assets/exercises/plank.gif',
+      imageAsset: 'assets/exercises/back_extension.gif',
       muscleAsset: 'assets/muscles/bird_dog.png',
     ),
     ExerciseMeta(
@@ -1238,7 +1238,7 @@ class ExerciseLibrary {
       '抬腿至与地面平行或更高',
       '慢下控制',
       ],
-      imageAsset: 'assets/exercises/plank.gif',
+      imageAsset: 'assets/exercises/hanging_leg_raise.png',
       muscleAsset: 'assets/muscles/hanging_leg_raise.png',
     ),
   ];
