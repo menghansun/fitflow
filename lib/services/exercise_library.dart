@@ -198,8 +198,8 @@ class ExerciseLibrary {
       '感受胸肌拉伸和收缩',
       '不要借助身体力量',
       ],
-      imageAsset: 'assets/exercises/lateral_raise.gif',
-      muscleAsset: 'assets/muscles/lateral_raise.png',
+      imageAsset: 'assets/exercises/cable_fly.png',
+      muscleAsset: 'assets/muscles/cable_fly.png',
     ),
     ExerciseMeta(
       name: '单臂哑铃划船',
@@ -249,8 +249,8 @@ class ExerciseLibrary {
       tips: ['俯身约45度', '哑铃垂直上下移动', '背部平直不弓背'],
       targetMuscles: ['背阔肌', '斜方肌', '菱形肌'],
       cues: ['掌心朝下握住杠铃。臀部向后推并前倾，保持背部平直，直到躯干与地面大致平行。', '把杠拉向躯干，同时肘部微微内收。', '在开始下一次重复前，将肘部完全伸直。'],
-      imageAsset: 'assets/exercises/seated_row.gif',
-      muscleAsset: 'assets/muscles/bent_over_row.png',
+      imageAsset: 'assets/exercises/barbell_row.gif',
+      muscleAsset: 'assets/muscles/barbell_row.png',
       videoUrl:'https://media.musclewiki.com/media/uploads/videos/branded/female-barbell-pronated-row-side.mp4',
     ),
     ExerciseMeta(
@@ -275,8 +275,8 @@ class ExerciseLibrary {
       tips: ['向外向后拉', '大拇指朝上', '肩胛骨向中间夹'],
       targetMuscles: ['三角肌后束', '斜方肌', '小圆肌'],
       cues: ['握住手柄，后退几步。把臀部向后推，使上身略微前倾', '用肩部带动动作，不要用肘部。到最底部时，想象将把手从大腿间拉过。'],
-      imageAsset: 'assets/exercises/face_pull.gif',
-      muscleAsset: 'assets/muscles/face_pull.png',
+      imageAsset: 'assets/exercises/lat_pulldown.gif',
+      muscleAsset: 'assets/muscles/lat_pulldown.png',
       videoUrl:'https://media.musclewiki.com/media/uploads/videos/branded/female-Cables-cable-pullover-side.mp4',
     ),
     ExerciseMeta(
@@ -549,7 +549,7 @@ class ExerciseLibrary {
       '弯举至胸前',
       '慢下控制',
       ],
-      imageAsset: 'assets/exercises/hammer_curl.gif',
+      imageAsset: 'assets/exercises/bicep_curl.gif',
       muscleAsset: 'assets/muscles/barbell_curl.png',
     ),
     ExerciseMeta(
@@ -593,7 +593,7 @@ class ExerciseLibrary {
       '向下压直到手臂伸直',
       '顶峰收缩',
       ],
-      imageAsset: 'assets/exercises/push_up.gif',
+      imageAsset: 'assets/exercises/cable_curl.png',
       muscleAsset: 'assets/muscles/tricep_pushdown.png',
     ),
     ExerciseMeta(
@@ -615,7 +615,7 @@ class ExerciseLibrary {
       '前臂上下移动',
       '控制动作速度',
       ],
-      imageAsset: 'assets/exercises/arnold_press.gif',
+      imageAsset: 'assets/exercises/dumbbell_shoulder_press.png',
       muscleAsset: 'assets/muscles/overhead_extension.png',
     ),
     ExerciseMeta(
