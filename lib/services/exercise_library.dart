@@ -640,7 +640,7 @@ class ExerciseLibrary {
       '膝盖向外撑开',
       '重心在脚后跟',
       ],
-      imageAsset: 'assets/exercises/romanian_deadlift.gif',
+      imageAsset: 'assets/exercises/hack_squat.png',
       muscleAsset: 'assets/muscles/squat.png',
     ),
     ExerciseMeta(
@@ -713,7 +713,7 @@ class ExerciseLibrary {
       '膝盖不要超伸',
       '保持核心收紧',
       ],
-      imageAsset: 'assets/exercises/romanian_deadlift.gif',
+      imageAsset: 'assets/exercises/hack_squat.png',
       muscleAsset: 'assets/muscles/leg_press.png',
     ),
     ExerciseMeta(
@@ -735,7 +735,7 @@ class ExerciseLibrary {
       '弯举至最高点',
       '控制离心下放',
       ],
-      imageAsset: 'assets/exercises/romanian_deadlift.gif',
+      imageAsset: 'assets/exercises/hack_squat.png',
       muscleAsset: 'assets/muscles/leg_curl.png',
     ),
     ExerciseMeta(
@@ -757,7 +757,7 @@ class ExerciseLibrary {
       '脚尖向上勾起',
       '顶峰收缩1秒',
       ],
-      imageAsset: 'assets/exercises/romanian_deadlift.gif',
+      imageAsset: 'assets/exercises/hack_squat.png',
       muscleAsset: 'assets/muscles/leg_extension.png',
     ),
     ExerciseMeta(
@@ -781,7 +781,7 @@ class ExerciseLibrary {
       '前蹲深度大腿与地面平行',
       '重心在前脚脚后跟',
       ],
-      imageAsset: 'assets/exercises/romanian_deadlift.gif',
+      imageAsset: 'assets/exercises/bulgarian_squat.png',
       muscleAsset: 'assets/muscles/bulgarian_split.png',
     ),
     ExerciseMeta(
