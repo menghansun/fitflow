@@ -85,6 +85,42 @@ class SupabaseService {
 
   // ── Workouts ─────────────────────────────────────────────
 
+  List<Map<String, dynamic>>? _serializeSwimSets(List<SwimSet>? swimSets) {
+    if (swimSets == null) return null;
+    return swimSets
+        .map((set) => {
+              'style': set.style.name,
+              'distance_meters': set.distanceMeters,
+            })
+        .toList();
+  }
+
+  List<SwimSet>? _deserializeSwimSets(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is! List) return null;
+
+    final result = <SwimSet>[];
+    for (final item in raw) {
+      if (item is! Map) continue;
+      final styleRaw = item['style'];
+      final distanceRaw = item['distance_meters'];
+      if (styleRaw is! String || distanceRaw == null) continue;
+
+      final style = SwimStyle.values.where((e) => e.name == styleRaw).firstOrNull;
+      final distanceMeters = switch (distanceRaw) {
+        int v => v,
+        double v => v.toInt(),
+        String v => int.tryParse(v),
+        _ => null,
+      };
+
+      if (style == null || distanceMeters == null) continue;
+      result.add(SwimSet(style: style, distanceMeters: distanceMeters));
+    }
+
+    return result.isEmpty ? null : result;
+  }
+
   /// Sync multiple workout sessions to Supabase in one batch
   Future<void> syncSessions(List<WorkoutSession> sessions) async {
     final userId = uid;
@@ -111,6 +147,7 @@ class SupabaseService {
       'end_date': s.endDate?.toIso8601String(),
       'counts_as_workout': s.countsAsWorkout,
       'local_updated_at': DateTime.now().millisecondsSinceEpoch,
+      'swim_sets': _serializeSwimSets(s.swimSets),
     }).toList();
 
     await _db.from('workouts').upsert(rows);
@@ -151,6 +188,7 @@ class SupabaseService {
           heartRateAvg: row['heart_rate_avg'] as int?,
           heartRateMax: row['heart_rate_max'] as int?,
           calories: row['calories'] as int?,
+          swimSets: _deserializeSwimSets(row['swim_sets']),
           poolLengthMeters: row['pool_length_meters'] as int?,
           totalDistanceMeters: row['total_distance_meters'] as int?,
           notes: row['notes'] as String?,
