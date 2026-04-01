@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../models/workout_session.dart';
+import '../providers/workout_provider.dart';
 import '../theme/app_theme.dart';
 import 'swim/swim_record_screen.dart';
 import 'gym/gym_session_screen.dart';
@@ -65,6 +67,9 @@ class SessionDetailScreen extends StatelessWidget {
             _SectionTitle('泳姿明细'),
             const SizedBox(height: 10),
             _SwimSetsCard(sets: session.swimSets!, accent: accent),
+            const SizedBox(height: 16),
+            // ── 游泳：历史最佳 ─────────────────────────
+            _SwimPersonalBest(session: session),
             const SizedBox(height: 16),
           ],
 
@@ -409,5 +414,160 @@ class _SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(title, style: Theme.of(context).textTheme.titleLarge);
+  }
+}
+
+// ── 游泳：历史最佳 ────────────────────────────────────────
+class _SwimPersonalBest extends StatelessWidget {
+  final WorkoutSession session;
+  const _SwimPersonalBest({required this.session});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<WorkoutProvider>(
+      builder: (context, provider, _) {
+        final swimSessions = provider.sessions
+            .where((s) => s.type == WorkoutType.swim && s.countsAsWorkout)
+            .toList();
+
+        if (swimSessions.isEmpty) return const SizedBox.shrink();
+
+        // 计算历史最佳
+        int? maxDistance;
+        int? maxDuration;
+        String? bestPace; // 越小越好
+        int? bestSwolf; // 越小越好
+
+        for (final s in swimSessions) {
+          if (s.totalDistanceMeters != null &&
+              (maxDistance == null || s.totalDistanceMeters! > maxDistance)) {
+            maxDistance = s.totalDistanceMeters;
+          }
+          if (s.durationMinutes != null &&
+              (maxDuration == null || s.durationMinutes! > maxDuration)) {
+            maxDuration = s.durationMinutes;
+          }
+          if (s.avgPace != null && bestPace != null) {
+            if (_comparePace(s.avgPace!, bestPace) < 0) {
+              bestPace = s.avgPace;
+            }
+          } else if (s.avgPace != null && bestPace == null) {
+            bestPace = s.avgPace;
+          }
+          if (s.swolfAvg != null &&
+              (bestSwolf == null || s.swolfAvg! < bestSwolf)) {
+            bestSwolf = s.swolfAvg;
+          }
+        }
+
+        final hasBestPace =
+            session.avgPace != null && bestPace != null && session.avgPace == bestPace;
+        final hasBestSwolf =
+            session.swolfAvg != null && bestSwolf != null && session.swolfAvg == bestSwolf;
+
+        final isCurrentSession = session.totalDistanceMeters == maxDistance ||
+            session.durationMinutes == maxDuration ||
+            hasBestPace ||
+            hasBestSwolf;
+
+        if (!isCurrentSession) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _SectionTitle('历史最佳'),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.swimAccent.withValues(alpha: 0.15),
+                    AppColors.swimAccent.withValues(alpha: 0.05),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.swimAccent.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      if (session.totalDistanceMeters == maxDistance)
+                        _BestBadge(label: '距离', value: '$maxDistance米', icon: Icons.pool_outlined),
+                      if (session.durationMinutes == maxDuration)
+                        _BestBadge(label: '时长', value: '$maxDuration分钟', icon: Icons.timer_outlined),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      if (hasBestPace)
+                        _BestBadge(label: '配速', value: '$bestPace/100米', icon: Icons.speed_outlined),
+                      if (hasBestSwolf)
+                        _BestBadge(label: 'SWOLF', value: '$bestSwolf', icon: Icons.star_outline),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  int _comparePace(String pace1, String pace2) {
+    // 解析配速格式如 6'43" 或 6:43
+    final p1 = _parsePace(pace1);
+    final p2 = _parsePace(pace2);
+    return p1.compareTo(p2);
+  }
+
+  int _parsePace(String pace) {
+    // 支持格式: 6'43" 或 6:43
+    String cleaned = pace.replaceAll("'", ':').replaceAll('"', '');
+    final parts = cleaned.split(':');
+    if (parts.length == 2) {
+      return int.parse(parts[0]) * 60 + int.parse(parts[1]);
+    }
+    return int.tryParse(cleaned) ?? 0;
+  }
+}
+
+class _BestBadge extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  const _BestBadge({required this.label, required this.value, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        margin: const EdgeInsets.only(right: 8),
+        decoration: BoxDecoration(
+          color: AppColors.swimAccent.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: AppColors.swimAccent),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: TextStyle(fontSize: 10, color: AppColors.swimAccent)),
+                  Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.swimAccent)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

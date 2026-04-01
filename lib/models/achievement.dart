@@ -328,11 +328,12 @@ class Achievement extends HiveObject {
       case AchievementType.swim50:
       case AchievementType.gym50:
       case AchievementType.streak7:
-      case AchievementType.endurance30:
       case AchievementType.core10:
       case AchievementType.legs10:
       case AchievementType.upperBody10:
         return 50;
+      case AchievementType.endurance30:
+        return 30;
       case AchievementType.lazy3:
         return 3;
       case AchievementType.swim100:
@@ -342,8 +343,9 @@ class Achievement extends HiveObject {
       case AchievementType.swimDistance10:
         return 10;
       case AchievementType.swimDistance50:
-      case AchievementType.calorie1000:
         return 50;
+      case AchievementType.calorie1000:
+        return 10;
       case AchievementType.swimDistance100:
         return 100;
       case AchievementType.monthlyWorkout10:

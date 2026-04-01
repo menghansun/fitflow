@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'dart:ui' as ui;
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:confetti/confetti.dart';
 import '../models/achievement.dart';
 import '../theme/app_theme.dart';
 
-class AchievementUnlockDialog extends StatelessWidget {
+class AchievementUnlockDialog extends StatefulWidget {
   final Achievement achievement;
 
   const AchievementUnlockDialog({
@@ -11,27 +12,43 @@ class AchievementUnlockDialog extends StatelessWidget {
     required this.achievement,
   });
 
-  // 用户自定义图标URL
-  static const String _iconUrl =
-      'https://minimax-algeng-chat-tts.oss-cn-wulanchabu.aliyuncs.com/ccv2%2F2026-03-26%2FMiniMax-M2.7%2F2031253183187128423%2Fc9e441477332a88e5839e9cd2cd5c2e0466f46cd6d72c01306f178caccab4d81..png';
+  @override
+  State<AchievementUnlockDialog> createState() => _AchievementUnlockDialogState();
+}
 
-  // 调侃话语列表
-  static const List<String> _jokes = [
-    '太棒了！继续保持，肌肉在向你招手！💪',
-    '哇哦！这是要成为运动达人的节奏吗？🏃',
-    '厉害！连太阳都在为你燃烧卡路里！☀️',
-    '太牛了！你就是健身房最靓的仔！😎',
-    '不错不错！距离马甲线又近了一步！🏋️',
-    '666！朋友都在问你是怎么做到的！🤙',
-    '这就是实力！继续保持，别骄傲哦~😏',
-    '解锁成就！你的身体已经记住这种感觉了！🎉',
-    '太秀了！你就是自律本人！💯',
-    '恭喜恭喜！这份荣誉你值得拥有！🏆',
-  ];
+class _AchievementUnlockDialogState extends State<AchievementUnlockDialog>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _rotateAnimation;
+  late ConfettiController _confettiController;
 
-  String get _randomJoke {
-    final index = achievement.title.hashCode % _jokes.length.abs();
-    return _jokes[index.abs()];
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+
+    _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
+    );
+
+    _rotateAnimation = Tween<double>(begin: -0.1, end: 0.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+
+    _confettiController = ConfettiController(duration: const Duration(seconds: 1));
+    _confettiController.play();
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _confettiController.dispose();
+    super.dispose();
   }
 
   @override
@@ -42,191 +59,177 @@ class AchievementUnlockDialog extends StatelessWidget {
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkSurface : Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: primary.withValues(alpha: 0.3),
-            width: 2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: primary.withValues(alpha: 0.2),
-              blurRadius: 30,
-              spreadRadius: 5,
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 顶部装饰
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    primary.withValues(alpha: 0.8),
-                    primary.withValues(alpha: 0.4),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+      child: Stack(
+        alignment: Alignment.topCenter,
+        children: [
+          // 对话框内容
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkSurface : Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: primary.withValues(alpha: 0.3),
+                width: 2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: primary.withValues(alpha: 0.2),
+                  blurRadius: 30,
+                  spreadRadius: 5,
                 ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: primary.withValues(alpha: 0.3),
-                    blurRadius: 20,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-              child: Center(
-                child: ClipOval(
-                  child: Image.network(
-                    _iconUrl,
-                    width: 60,
-                    height: 60,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Text(
-                        achievement.icon,
-                        style: const TextStyle(fontSize: 40),
-                      );
-                    },
-                  ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 顶部装饰 - 带动画
+                AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, child) {
+                    return Transform.scale(
+                      scale: _scaleAnimation.value,
+                      child: Transform.rotate(
+                        angle: _rotateAnimation.value,
+                        child: Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: SvgPicture.asset(
+                              'assets/achievement/学习成就.svg',
+                              width: 70,
+                              height: 70,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // 标题
-            Text(
-              '成就解锁',
-              style: TextStyle(
-                fontSize: 14,
-                color: primary,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 2,
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            // 成就名称
-            Text(
-              achievement.title,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: isDark ? AppColors.darkText : null,
-              ),
-            ),
-            const SizedBox(height: 4),
-
-            // 成就描述
-            Text(
-              achievement.description,
-              style: TextStyle(
-                fontSize: 14,
-                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // 达成时间
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.access_time,
-                    size: 16,
+                const SizedBox(height: 16),
+                // 标题
+                Text(
+                  '成就解锁',
+                  style: TextStyle(
+                    fontSize: 14,
                     color: primary,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 2,
                   ),
-                  const SizedBox(width: 6),
-                  Text(
-                    _formatDateTime(achievement.unlockedAt ?? DateTime.now()),
+                ),
+                const SizedBox(height: 8),
+                // 成就名称
+                Text(
+                  widget.achievement.title,
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? AppColors.darkText : null,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                // 成就描述
+                Text(
+                  widget.achievement.description,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // 达成时间
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.access_time,
+                      size: 16,
+                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _formatDateTime(widget.achievement.unlockedAt ?? DateTime.now()),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // 调侃话语
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? AppColors.darkCard.withValues(alpha: 0.5)
+                        : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    widget.achievement.joke,
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 13,
-                      color: primary,
-                      fontWeight: FontWeight.w500,
+                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                      fontStyle: FontStyle.italic,
                     ),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // 调侃话语
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? AppColors.darkCard.withValues(alpha: 0.5)
-                    : Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                _randomJoke,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                  fontStyle: FontStyle.italic,
                 ),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // 确定按钮
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                const SizedBox(height: 20),
+                // 确定按钮
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Text(
+                      '太棒了！',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ),
-                child: const Text(
-                  '太棒了！',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
+              ],
             ),
-          ],
-        ),
+          ),
+          // 烟花效果
+          ConfettiWidget(
+            confettiController: _confettiController,
+            blastDirectionality: BlastDirectionality.explosive,
+            particleDrag: 0.05,
+            emissionFrequency: 0.05,
+            numberOfParticles: 20,
+            gravity: 0.2,
+            shouldLoop: false,
+            colors: [
+              primary,
+              Colors.amber,
+              Colors.orange,
+              Colors.yellow,
+              Colors.red,
+            ],
+          ),
+        ],
       ),
     );
   }
 
   String _formatDateTime(DateTime dateTime) {
-    final now = DateTime.now();
-    final diff = now.difference(dateTime);
-
-    if (diff.inMinutes < 1) {
-      return '刚刚';
-    } else if (diff.inHours < 1) {
-      return '${diff.inMinutes}分钟前';
-    } else if (diff.inDays < 1) {
-      return '${diff.inHours}小时前';
-    } else {
-      return '${dateTime.month}月${dateTime.day}日 ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
-    }
+    return '${dateTime.month}月${dateTime.day}日 ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
 }
 

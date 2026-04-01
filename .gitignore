@@ -42,6 +42,7 @@ app.*.map.json
 lib/config/supabase_config.dart
 **/android/.gradle
 **/android/captures/
+**/android/**/.cxx/
 **/android/gradlew
 **/android/gradlew.bat
 **/android/local.properties

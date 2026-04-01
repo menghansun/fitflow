@@ -43,7 +43,6 @@ class AchievementProvider extends ChangeNotifier {
 
     final swimSessions = sessions.where((s) => s.type == WorkoutType.swim && s.countsAsWorkout).toList();
     final gymSessions = sessions.where((s) => s.type == WorkoutType.gym && s.countsAsWorkout).toList();
-    final cardioSessions = sessions.where((s) => s.type == WorkoutType.cardio && s.countsAsWorkout).toList();
     final allWorkouts = sessions.where((s) => s.countsAsWorkout).toList();
 
     // 游泳次数成就
@@ -69,6 +68,10 @@ class AchievementProvider extends ChangeNotifier {
     final r11 = await _updateAchievement(AchievementType.streak3, streak); if (r11 != null) newlyUnlocked.add(r11);
     final r12 = await _updateAchievement(AchievementType.streak7, streak); if (r12 != null) newlyUnlocked.add(r12);
     final r13 = await _updateAchievement(AchievementType.streak30, streak); if (r13 != null) newlyUnlocked.add(r13);
+
+    // 躺平成就 - 连续不运动
+    final lazyDays = _calculateLazyDays(allWorkouts);
+    final rLazy = await _updateAchievement(AchievementType.lazy3, lazyDays); if (rLazy != null) newlyUnlocked.add(rLazy);
 
     // 月度成就
     final now = DateTime.now();
@@ -204,6 +207,31 @@ class AchievementProvider extends ChangeNotifier {
     }
 
     return streak;
+  }
+
+  int _calculateLazyDays(List<WorkoutSession> sessions) {
+    if (sessions.isEmpty) return 0;
+
+    // 按日期分组并排序
+    final workoutDates = sessions
+        .map((s) => DateTime(s.date.year, s.date.month, s.date.day))
+        .toSet()
+        .toList()
+      ..sort((a, b) => b.compareTo(a)); // 降序排列
+
+    if (workoutDates.isEmpty) return 0;
+
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+
+    // 如果最近一次运动是今天，不算懒
+    final mostRecentDate = workoutDates.first;
+    if (mostRecentDate == todayDate) {
+      return 0;
+    }
+
+    // 计算距离最后一次运动过去了多少天
+    return todayDate.difference(mostRecentDate).inDays;
   }
 
   List<Achievement> getByCategory(String category) {

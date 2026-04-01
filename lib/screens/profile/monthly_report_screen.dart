@@ -677,10 +677,6 @@ class _SwimReportContent extends StatelessWidget {
         _MonthHeatmapCard(year: year, month: month, sessions: sessions),
         const SizedBox(height: 16),
 
-        // ── Milestones ────────────────────────────────────
-        _MilestonesCard(milestones: milestones),
-        const SizedBox(height: 20),
-
         // ── Distance Trend Chart ──────────────────────────
         _DistanceChart(sessions: sessions, year: year, month: month),
         const SizedBox(height: 20),
@@ -1783,94 +1779,107 @@ class _PersonalRecordsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    int maxDist = 0;
-    int bestPaceMin = 999;
-    int bestPaceSec = 0;
-    int longestSession = 0;
+    return Consumer<WorkoutProvider>(
+      builder: (context, provider, _) {
+        final allSwimSessions = provider.sessions
+            .where((s) => s.type == WorkoutType.swim && s.countsAsWorkout)
+            .toList();
 
-    for (final s in sessions) {
-      final dist = s.totalDistanceMeters ?? 0;
-      if (dist > maxDist) maxDist = dist;
+        int maxDist = 0;
+        int bestPaceMin = 999;
+        int bestPaceSec = 0;
+        int longestSession = 0;
+        int bestSwolf = 999;
 
-      final duration = s.durationInMinutes;
-      if (duration > longestSession) longestSession = duration;
+        for (final s in allSwimSessions) {
+          final dist = s.totalDistanceMeters ?? 0;
+          if (dist > maxDist) maxDist = dist;
 
-      if (dist > 0 && duration > 0) {
-        final pacePerHm = duration / (dist / 100);
-        final totalSec = (pacePerHm * 60).round();
-        if (totalSec < bestPaceMin * 60 + bestPaceSec || bestPaceMin == 999) {
-          bestPaceMin = totalSec ~/ 60;
-          bestPaceSec = totalSec % 60;
+          final duration = s.durationInMinutes;
+          if (duration > longestSession) longestSession = duration;
+
+          if (dist > 0 && duration > 0) {
+            final pacePerHm = duration / (dist / 100);
+            final totalSec = (pacePerHm * 60).round();
+            if (totalSec < bestPaceMin * 60 + bestPaceSec || bestPaceMin == 999) {
+              bestPaceMin = totalSec ~/ 60;
+              bestPaceSec = totalSec % 60;
+            }
+          }
+
+          if (s.swolfAvg != null && s.swolfAvg! < bestSwolf) {
+            bestSwolf = s.swolfAvg!;
+          }
         }
-      }
-    }
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 15,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Text('🏆', style: TextStyle(fontSize: 16)),
-              SizedBox(width: 6),
-              Text('本月最佳', style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF3D3D3D),
-              )),
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 15,
+                offset: const Offset(0, 4),
+              ),
             ],
           ),
-          const SizedBox(height: 16),
-          Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: _RecordTile(
-                icon: '📏',
-                label: '单次最长',
-                value: maxDist > 0 ? '${(maxDist / 1000).toStringAsFixed(1)}km' : '--',
-                color: _swimPrimary,
-              )),
-              const SizedBox(width: 12),
-              Expanded(child: _RecordTile(
-                icon: '⏱️',
-                label: '最长训练',
-                value: longestSession > 0 ? '${longestSession}分钟' : '--',
-                color: const Color(0xFF52C9A4),
-              )),
-              const SizedBox(width: 12),
-              Expanded(child: _RecordTile(
-                icon: '⚡',
-                label: '最快配速',
-                value: bestPaceMin < 999 ? '$bestPaceMin\'${bestPaceSec.toString().padLeft(2, '0')}' : '--',
-                color: const Color(0xFFFFB347),
-              )),
+              Row(
+                children: [
+                  Text('🏆', style: TextStyle(fontSize: 16, color: _swimPrimary)),
+                  const SizedBox(width: 6),
+                  const Text('历史最佳', style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF3D3D3D),
+                  )),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(child: _RecordTile(
+                    label: '最远距离',
+                    value: maxDist > 0 ? '${(maxDist / 1000).toStringAsFixed(1)}km' : '--',
+                    color: _swimPrimary,
+                  )),
+                  Expanded(child: _RecordTile(
+                    label: '最久时长',
+                    value: longestSession > 0 ? '${longestSession}分钟' : '--',
+                    color: const Color(0xFF52C9A4),
+                  )),
+                  Expanded(child: _RecordTile(
+                    label: '最快配速',
+                    value: bestPaceMin < 999 ? '$bestPaceMin\'${bestPaceSec.toString().padLeft(2, '0')}' : '--',
+                    color: const Color(0xFFFFB347),
+                  )),
+                  Expanded(child: _RecordTile(
+                    label: '最佳SWOLF',
+                    value: bestSwolf < 999 ? '$bestSwolf' : '--',
+                    color: const Color(0xFF9B59B6),
+                  )),
+                ],
+              ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
 
 class _RecordTile extends StatelessWidget {
-  final String icon;
+  final String? icon;
   final String label;
   final String value;
   final Color color;
 
   const _RecordTile({
-    required this.icon,
+    this.icon,
     required this.label,
     required this.value,
     required this.color,
@@ -1886,8 +1895,10 @@ class _RecordTile extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Text(icon, style: const TextStyle(fontSize: 18)),
-          const SizedBox(height: 6),
+          if (icon != null) ...[
+            Text(icon!, style: const TextStyle(fontSize: 18)),
+            const SizedBox(height: 6),
+          ],
           Text(
             value,
             style: TextStyle(

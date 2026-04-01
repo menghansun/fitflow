@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../providers/achievement_provider.dart';
 import '../../models/achievement.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/achievement_unlock_dialog.dart';
 
 class AchievementScreen extends StatelessWidget {
   const AchievementScreen({super.key});
@@ -158,7 +159,6 @@ class _AchievementSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,14 +185,20 @@ class _AchievementSection extends StatelessWidget {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            childAspectRatio: 1.1,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
+            crossAxisCount: 3,
+            childAspectRatio: 0.9,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
           ),
           itemCount: achievements.length,
           itemBuilder: (context, index) {
-            return _AchievementCard(achievement: achievements[index]);
+            final achievement = achievements[index];
+            return _AchievementCard(
+              achievement: achievement,
+              onTap: achievement.unlocked
+                  ? () => showAchievementUnlockDialog(context, achievement)
+                  : null,
+            );
           },
         ),
         const SizedBox(height: 24),
@@ -203,8 +209,9 @@ class _AchievementSection extends StatelessWidget {
 
 class _AchievementCard extends StatelessWidget {
   final Achievement achievement;
+  final VoidCallback? onTap;
 
-  const _AchievementCard({required this.achievement});
+  const _AchievementCard({required this.achievement, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -212,27 +219,30 @@ class _AchievementCard extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
     final isUnlocked = achievement.unlocked;
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isUnlocked
-            ? (isDark
-                ? AppColors.darkCard
-                : Colors.white)
-            : (isDark
-                ? AppColors.darkCard.withValues(alpha: 0.5)
-                : Colors.grey.shade100),
-        borderRadius: BorderRadius.circular(16),
-        border: isUnlocked
-            ? Border.all(
-                color: theme.colorScheme.primary.withValues(alpha: 0.3),
-                width: 1.5,
-              )
-            : null,
-        boxShadow: isUnlocked
-            ? [
-                BoxShadow(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isUnlocked
+              ? (isDark
+                  ? AppColors.darkCard
+                  : Colors.white)
+              : (isDark
+                  ? AppColors.darkCard.withValues(alpha: 0.5)
+                  : Colors.grey.shade100),
+          borderRadius: BorderRadius.circular(12),
+          border: isUnlocked
+              ? Border.all(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                  width: 1.5,
+                )
+              : null,
+          boxShadow: isUnlocked
+              ? [
+                  BoxShadow(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -245,8 +255,8 @@ class _AchievementCard extends StatelessWidget {
         children: [
           // 图标
           Container(
-            width: 44,
-            height: 44,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
               color: isUnlocked
                   ? theme.colorScheme.primary.withValues(alpha: 0.15)
@@ -259,19 +269,19 @@ class _AchievementCard extends StatelessWidget {
               child: Text(
                 achievement.icon,
                 style: TextStyle(
-                  fontSize: 24,
+                  fontSize: 20,
                   color: isUnlocked ? null : Colors.grey,
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           // 标题
           Text(
             achievement.title,
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.bold,
-              fontSize: 12,
+              fontSize: 10,
               color: isUnlocked
                   ? (isDark ? AppColors.darkText : null)
                   : Colors.grey,
@@ -280,7 +290,7 @@ class _AchievementCard extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           // 描述
           Text(
             achievement.description,
@@ -288,29 +298,29 @@ class _AchievementCard extends StatelessWidget {
               color: isUnlocked
                   ? (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)
                   : Colors.grey,
-              fontSize: 11,
+              fontSize: 9,
             ),
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           // 进度或解锁日期
           if (isUnlocked)
             Text(
               _formatDate(achievement.unlockedAt),
-              style: TextStyle(
-                fontSize: 10,
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.w500,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                fontSize: 11,
               ),
             )
           else
             _ProgressBar(progress: achievement.progress),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   String _formatDate(DateTime? date) {
     if (date == null) return '';

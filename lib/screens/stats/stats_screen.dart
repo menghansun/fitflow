@@ -48,42 +48,6 @@ class _StatsScreenState extends State<StatsScreen>
     });
   }
 
-  void _goToPrev() {
-    setState(() {
-      switch (_tabCtrl.index) {
-        case 0: // 周
-          _currentDate = _currentDate.subtract(const Duration(days: 7));
-          break;
-        case 1: // 月
-          _currentDate = DateTime(_currentDate.year, _currentDate.month - 1, 1);
-          break;
-        case 2: // 年
-          _currentDate = DateTime(_currentDate.year - 1, 1, 1);
-          break;
-        case 3: // 全部，不切换
-          break;
-      }
-    });
-  }
-
-  void _goToNext() {
-    setState(() {
-      switch (_tabCtrl.index) {
-        case 0: // 周
-          _currentDate = _currentDate.add(const Duration(days: 7));
-          break;
-        case 1: // 月
-          _currentDate = DateTime(_currentDate.year, _currentDate.month + 1, 1);
-          break;
-        case 2: // 年
-          _currentDate = DateTime(_currentDate.year + 1, 1, 1);
-          break;
-        case 3: // 全部，不切换
-          break;
-      }
-    });
-  }
-
   GlobalKey _getCurrentKey() {
     switch (_tabCtrl.index) {
       case 0: return _weekKey;
@@ -105,6 +69,12 @@ class _StatsScreenState extends State<StatsScreen>
       default:
         return '全部运动报告';
     }
+  }
+
+  int _getWeekNumber(DateTime date) {
+    final firstDayOfYear = DateTime(date.year, 1, 1);
+    final daysDifference = date.difference(firstDayOfYear).inDays;
+    return ((daysDifference + firstDayOfYear.weekday - 1) / 7).ceil();
   }
 
   Future<void> _shareCard(BuildContext ctx) async {
@@ -204,40 +174,6 @@ class _StatsScreenState extends State<StatsScreen>
     } finally {
       if (mounted) setState(() => _saving = false);
     }
-  }
-
-  String _getPeriodLabel() {
-    // 如果有自定义日期范围，显示范围
-    if (_dateRange != null) {
-      final start = _dateRange!.start;
-      final end = _dateRange!.end;
-      return '${start.month}/${start.day}-${end.month}/${end.day}';
-    }
-    switch (_tabCtrl.index) {
-      case 0: // 周
-        final weekNum = _getWeekNumber(_currentDate);
-        return '${_currentDate.year}年 第${weekNum}周';
-      case 1: // 月
-        return '${_currentDate.year}年${_currentDate.month}月';
-      case 2: // 年
-        return '${_currentDate.year}年';
-      case 3: // 全部
-        return '';
-      default:
-        return '';
-    }
-  }
-
-  int _getWeekNumber(DateTime date) {
-    final firstDayOfYear = DateTime(date.year, 1, 1);
-    final daysDifference = date.difference(firstDayOfYear).inDays;
-    return ((daysDifference + firstDayOfYear.weekday - 1) / 7).ceil();
-  }
-
-  (_Period, DateTime, DateTime) _getCurrentPeriod() {
-    final period = _Period.values[_tabCtrl.index];
-    final (start, end) = _range(_currentDate, period);
-    return (period, start, end);
   }
 
   Future<void> _showPeriodPicker(BuildContext context) async {
@@ -421,7 +357,7 @@ class _MonthStatsView extends StatelessWidget {
         final totalDays = DateTime(end.year, end.month + 1, 0).day;
         final gymSets = gymSessions.fold<int>(
             0, (sum, s) => sum + (s.exercises?.fold<int>(0, (s2, e) => s2 + e.sets.length) ?? 0));
-        final cardioMins = cardioSessions.fold<int>(0, (sum, s) => sum + (s.durationInMinutes ?? 0));
+        final cardioMins = cardioSessions.fold<int>(0, (sum, s) => sum + s.durationInMinutes);
         final monthName = '${end.year}年${end.month}月';
 
         // 计算每日热量
@@ -675,7 +611,7 @@ class _WeekStatsView extends StatelessWidget {
             .length;
         final gymSets = gymSessions.fold<int>(
             0, (sum, s) => sum + (s.exercises?.fold<int>(0, (s2, e) => s2 + e.sets.length) ?? 0));
-        final cardioMins = cardioSessions.fold<int>(0, (sum, s) => sum + (s.durationInMinutes ?? 0));
+        final cardioMins = cardioSessions.fold<int>(0, (sum, s) => sum + s.durationInMinutes);
 
         // 计算每日热量
         final dailyCalories = <int, int>{};
@@ -924,7 +860,7 @@ class _YearStatsView extends StatelessWidget {
         }
         final gymSets = gymSessions.fold<int>(
             0, (sum, s) => sum + (s.exercises?.fold<int>(0, (s2, e) => s2 + e.sets.length) ?? 0));
-        final cardioMins = cardioSessions.fold<int>(0, (sum, s) => sum + (s.durationInMinutes ?? 0));
+        final cardioMins = cardioSessions.fold<int>(0, (sum, s) => sum + s.durationInMinutes);
 
         // 计算每月热量
         final monthlyCalories = <int, int>{};
@@ -1221,7 +1157,6 @@ class _YearHeatmapFullscreenDialogState extends State<_YearHeatmapFullscreenDial
     final spacing = 1.0;
 
     final textColor = widget.isDark ? AppColors.darkText : AppColors.lightText;
-    final cardBg = widget.isDark ? AppColors.darkCard : Colors.white;
 
     // 月份起始周索引
     final monthStartWeek = <int, int>{};
@@ -1348,156 +1283,6 @@ class _YearHeatmapFullscreenDialogState extends State<_YearHeatmapFullscreenDial
     if (cal <= 800) return widget.isDark ? const Color(0xFF7B82D5) : const Color(0xFF9F87F5);
     if (cal <= 1200) return widget.isDark ? const Color(0xFF9F9FE8) : const Color(0xFF6B5EE6);
     return widget.isDark ? const Color(0xFFBDBDFA) : const Color(0xFF4C3FD9);
-  }
-}
-
-class _YearWeekHeatmapLarge extends StatelessWidget {
-  final int year;
-  final List<WorkoutSession> sessions;
-  final bool isDark;
-
-  const _YearWeekHeatmapLarge({required this.year, required this.sessions, required this.isDark});
-
-  Color _activityColorLocal(int cal) {
-    if (cal == 0) return isDark ? const Color(0xFF2D3566) : const Color(0xFFEBEDF0);
-    if (cal <= 200) return isDark ? const Color(0xFF3D4580) : const Color(0xFFEFE8FF);
-    if (cal <= 500) return isDark ? const Color(0xFF5D65B0) : const Color(0xFFCDBDFB);
-    if (cal <= 800) return isDark ? const Color(0xFF7B82D5) : const Color(0xFF9F87F5);
-    if (cal <= 1200) return isDark ? const Color(0xFF9F9FE8) : const Color(0xFF6B5EE6);
-    return isDark ? const Color(0xFFBDBDFA) : const Color(0xFF4C3FD9);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final dailyCalories = <DateTime, int>{};
-    for (final s in sessions) {
-      if (s.date.year == year) {
-        final day = DateTime(s.date.year, s.date.month, s.date.day);
-        dailyCalories[day] = (dailyCalories[day] ?? 0) + (s.calories ?? 0);
-      }
-    }
-
-    final firstDay = DateTime(year, 1, 1);
-    final daysInYear = DateTime(year, 12, 31).difference(firstDay).inDays + 1;
-    final firstWeekday = firstDay.weekday;
-
-    const squareSize = 14.0;
-    const daySpacing = 2.0;
-    final weeksInYear = ((daysInYear + firstWeekday - 1) / 7).ceil();
-    final textColor = isDark ? AppColors.darkText : AppColors.lightText;
-
-    // 月份标签
-    const months = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
-
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '今年运动分布（每日热量）',
-              style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 16),
-            // 月份标签行
-            SizedBox(
-              height: 20,
-              child: Row(
-                children: [
-                  const SizedBox(width: 30), // 留出星期标签的空间
-                  Expanded(
-                    child: GridView.count(
-                      shrinkWrap: true,
-                      crossAxisCount: 12,
-                      childAspectRatio: 1.5,
-                      physics: const NeverScrollableScrollPhysics(),
-                      children: List.generate(12, (i) {
-                        return Center(
-                          child: Text(
-                            '${i + 1}',
-                            style: TextStyle(color: textColor.withValues(alpha: 0.7), fontSize: 10),
-                          ),
-                        );
-                      }),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 4),
-            // 主热力图
-            SizedBox(
-              height: squareSize * 7 + daySpacing * 6 + 20,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: SizedBox(
-                  width: weeksInYear * (squareSize + daySpacing) + 30,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 星期标签列
-                      Column(
-                        children: ['一', '二', '三', '四', '五', '六', '日'].asMap().entries.map((e) {
-                          return Container(
-                            height: squareSize,
-                            width: 24,
-                            alignment: Alignment.center,
-                            child: Text(
-                              e.value,
-                              style: TextStyle(color: textColor.withValues(alpha: 0.5), fontSize: 9),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                      // 星期标签和热力图之间
-                      const SizedBox(width: 6),
-                      // 主热力图
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: List.generate(weeksInYear, (weekIdx) {
-                          return Padding(
-                            padding: EdgeInsets.only(right: daySpacing),
-                            child: SizedBox(
-                              width: squareSize,
-                              child: Column(
-                                children: List.generate(7, (dayIdx) {
-                                  final dayInYear = weekIdx * 7 + dayIdx - (firstWeekday - 1);
-                                  if (dayInYear < 0 || dayInYear >= daysInYear) {
-                                    return SizedBox(width: squareSize, height: squareSize);
-                                  }
-                                  final date = firstDay.add(Duration(days: dayInYear));
-                                  final cal = dailyCalories[date] ?? 0;
-
-                                  return Padding(
-                                    padding: EdgeInsets.only(bottom: dayIdx < 6 ? daySpacing : 0),
-                                    child: Tooltip(
-                                      message: '${date.month}/${date.day}: ${cal}千卡',
-                                      child: Container(
-                                        width: squareSize,
-                                        height: squareSize,
-                                        decoration: BoxDecoration(
-                                          color: cal > 0 ? _activityColorLocal(cal) : (isDark ? const Color(0xFF1E2640) : Colors.grey.shade200),
-                                          borderRadius: BorderRadius.circular(2),
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                }),
-                              ),
-                            ),
-                          );
-                        }),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 
@@ -1662,12 +1447,6 @@ class _YearWeekHeatmap extends StatelessWidget {
       ],
     ),
     );
-  }
-
-  int _getWeekNumber(DateTime date) {
-    final firstDayOfYear = DateTime(date.year, 1, 1);
-    final daysDifference = date.difference(firstDayOfYear).inDays;
-    return ((daysDifference + firstDayOfYear.weekday - 1) / 7).ceil();
   }
 }
 
