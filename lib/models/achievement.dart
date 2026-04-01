@@ -21,6 +21,7 @@ enum AchievementType {
   streak3,
   streak7,
   streak30,
+  lazy3,  // 连续3天不运动
 
   // 月度类
   monthlySwim5,
@@ -103,6 +104,8 @@ class Achievement extends HiveObject {
         return '一周坚持';
       case AchievementType.streak30:
         return '月度坚持';
+      case AchievementType.lazy3:
+        return '躺平达人';
       // 月度
       case AchievementType.monthlySwim5:
         return '月度泳者';
@@ -165,6 +168,8 @@ class Achievement extends HiveObject {
         return '连续运动7天';
       case AchievementType.streak30:
         return '连续运动30天';
+      case AchievementType.lazy3:
+        return '连续3天不运动';
       // 月度
       case AchievementType.monthlySwim5:
         return '单月游泳5次';
@@ -218,6 +223,8 @@ class Achievement extends HiveObject {
       case AchievementType.streak7:
       case AchievementType.streak30:
         return '🔥';
+      case AchievementType.lazy3:
+        return '😴';
       // 月度
       case AchievementType.monthlySwim5:
       case AchievementType.monthlyWorkout10:
@@ -244,6 +251,70 @@ class Achievement extends HiveObject {
     }
   }
 
+  String get joke {
+    switch (type) {
+      // 游泳
+      case AchievementType.swimFirst:
+        return '游泳就和呼吸一样简单！🏊';
+      case AchievementType.swim10:
+        return '游泳是一个人的兵荒马乱！💪';
+      case AchievementType.swim50:
+        return '天吶！五十米池对你轻轻松松了吧🌊';
+      case AchievementType.swim100:
+        return '百次游泳里程碑！你就是水中蛟龙！🐉';
+      case AchievementType.swimDistance10:
+        return '十公里达成！相当于游了400圈！🏅';
+      case AchievementType.swimDistance50:
+        return '五十公里！可以横渡海峡了！🌊';
+      case AchievementType.swimDistance100:
+        return '百公里传奇！国家队没你真是他们的损失！🏆';
+      // 健身
+      case AchievementType.gymFirst:
+        return '第一次健身！挥洒汗水的开始！💪';
+      case AchievementType.gym10:
+        return '十次健身达成！越来越强了！🔥';
+      case AchievementType.gym50:
+        return '五十次健身！健身房里你最帅！😎';
+      // 连续
+      case AchievementType.streak3:
+        return '三日连击！I am 思壮！🔥';
+      case AchievementType.streak7:
+        return '一周坚持！回本了回本了！⏰';
+      case AchievementType.streak30:
+        return 'umbelievable🏆这你都能完成';
+      case AchievementType.lazy3:
+        return '你完全不运动的是吗？😴';
+      // 月度
+      case AchievementType.monthlySwim5:
+        return '浅水区小酌！~🌟';
+      case AchievementType.monthlyWorkout10:
+        return '深水区畅饮！~🎯';
+      // 热量
+      case AchievementType.burn100:
+        return '百卡燃烧！也就一个蛋挞！🔥';
+      case AchievementType.calorie1000:
+        return '千卡成就！卡路里富翁在此！💰';
+      // 时长
+      case AchievementType.endurance30:
+        return '三十分钟耐力！意志力的胜利！⏱️';
+      case AchievementType.ironMan:
+        return '铁人诞生！你运动了一个小时耶！🏅';
+      // 部位
+      case AchievementType.core10:
+        return '核心强化！召唤马甲线！🎯';
+      case AchievementType.legs10:
+        return '痛！好痛💪';
+      case AchievementType.upperBody10:
+        return '肌肉没涨，但是还是累到了呢~！💪';
+      // 全能
+      case AchievementType.allRounder:
+        return '汗流浃背了吧！🏅';
+      // 泳姿
+      case AchievementType.freestyleUnlocked:
+        return '喝饱了吧~~~！🏊';
+    }
+  }
+
   int get targetValue {
     switch (type) {
       case AchievementType.swimFirst:
@@ -262,11 +333,14 @@ class Achievement extends HiveObject {
       case AchievementType.legs10:
       case AchievementType.upperBody10:
         return 50;
+      case AchievementType.lazy3:
+        return 3;
       case AchievementType.swim100:
-      case AchievementType.swimDistance10:
       case AchievementType.streak30:
       case AchievementType.burn100:
         return 100;
+      case AchievementType.swimDistance10:
+        return 10;
       case AchievementType.swimDistance50:
       case AchievementType.calorie1000:
         return 50;
@@ -323,6 +397,7 @@ class AchievementDefinition {
       case AchievementType.streak3:
       case AchievementType.streak7:
       case AchievementType.streak30:
+      case AchievementType.lazy3:
         return categoryStreak;
       // 月度
       case AchievementType.monthlySwim5:
