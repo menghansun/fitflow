@@ -71,11 +71,11 @@ class _FitFlowAppState extends State<FitFlowApp> {
                     context.read<WorkoutProvider>().onSessionsChanged = () async {
                       final sessions = context.read<WorkoutProvider>().sessions;
                       final newlyUnlocked = await context.read<AchievementProvider>().checkAndUpdateAchievements(sessions);
-                      // 显示解锁弹窗
+                      final dialogContext = _navigatorKey.currentContext;
+                      if (dialogContext == null) return;
+
                       for (final achievement in newlyUnlocked) {
-                        if (context.mounted) {
-                          showAchievementUnlockDialog(context, achievement);
-                        }
+                        await showAchievementUnlockDialog(dialogContext, achievement);
                       }
                     };
                     // 初始检查成就（不显示弹窗）
@@ -99,11 +99,11 @@ class _FitFlowAppState extends State<FitFlowApp> {
                         context.read<WorkoutProvider>().onSessionsChanged = () async {
                           final sessions = context.read<WorkoutProvider>().sessions;
                           final newlyUnlocked = await context.read<AchievementProvider>().checkAndUpdateAchievements(sessions);
-                          // 显示解锁弹窗
+                          final dialogContext = _navigatorKey.currentContext;
+                          if (dialogContext == null) return;
+
                           for (final achievement in newlyUnlocked) {
-                            if (context.mounted) {
-                              showAchievementUnlockDialog(context, achievement);
-                            }
+                            await showAchievementUnlockDialog(dialogContext, achievement);
                           }
                         };
                         // 初始检查成就（不显示弹窗）
