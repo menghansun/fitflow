@@ -225,6 +225,14 @@ class SupabaseService {
     await _db.from('workouts').delete().eq('id', sessionId).eq('user_id', userId);
   }
 
+  /// Force-push ALL local sessions to cloud, overwriting any stale cloud data.
+  /// Use this for one-time backfill after fixing a sync bug.
+  Future<void> forcePushAllToCloud(List<WorkoutSession> sessions) async {
+    final userId = uid;
+    if (userId == null) return;
+    await syncSessions(sessions);
+  }
+
   /// Fetch all cloud sessions for current user
   Future<List<WorkoutSession>> fetchSessions() async {
     final userId = uid;

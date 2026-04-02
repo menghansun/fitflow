@@ -79,6 +79,14 @@ class WorkoutProvider extends ChangeNotifier {
     await SupabaseService.instance.syncSessions(_sessions);
   }
 
+  /// One-time backfill: force-push all local gym sessions to cloud,
+  /// repairing any sessions that were previously synced without exercises data.
+  Future<void> backfillGymExercisesToCloud() async {
+    final gymSessions = _sessions.where((s) => s.type == WorkoutType.gym).toList();
+    if (gymSessions.isEmpty) return;
+    await SupabaseService.instance.forcePushAllToCloud(gymSessions);
+  }
+
   /// Pull cloud sessions and merge with local (cloud wins if newer)
   Future<void> loadFromCloud() async {
     final cloudSessions = await SupabaseService.instance.fetchSessions();
@@ -92,9 +100,15 @@ class WorkoutProvider extends ChangeNotifier {
       if (local == null) {
         // Cloud only
         await box.put(cloud.id, cloud);
+      } else if (cloud.type == WorkoutType.gym &&
+                 (local.exercises != null && local.exercises!.isNotEmpty) &&
+                 (cloud.exercises == null || cloud.exercises!.isEmpty)) {
+        // Cloud gym session has no exercises but local does — preserve local
+        // (local has the correct data, cloud was synced before bug was fixed)
+      } else {
+        // Default: cloud wins
+        await box.put(cloud.id, cloud);
       }
-      // If cloud is newer (by date), overwrite local — simplified: cloud always wins
-      await box.put(cloud.id, cloud);
     }
     // Always reload after cloud sync so achievement unlockedAt can be backfilled
     if (cloudSessions.isNotEmpty) _reload();
@@ -190,4 +204,28 @@ class WorkoutProvider extends ChangeNotifier {
     }
     return streak;
   }
+
+  // ── Muscle group stats ─────────────────────────────────
+
+  /// Returns count of exercises per MuscleGroup for the given period (gym sessions only).
+  Map<MuscleGroup, int> getMuscleGroupCounts(DateTime start, DateTime end) {
+    final result = <MuscleGroup, int>{};
+    for (final s in _inPeriod(start, end)) {
+      if (s.type != WorkoutType.gym || s.exercises == null) continue;
+      for (final ex in s.exercises!) {
+        result[ex.muscleGroup] = (result[ex.muscleGroup] ?? 0) + 1;
+      }
+    }
+    return result;
+  }
+
+  /// Returns the top MuscleGroup for the given period (gym sessions only).
+  MuscleGroup? getTopMuscleGroup(DateTime start, DateTime end) {
+    final counts = getMuscleGroupCounts(start, end);
+    if (counts.isEmpty) return null;
+    return counts.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
+  }
+
+  /// Alias for _inPeriod — used by stats_screen
+  List<WorkoutSession> sessionsInPeriod(DateTime start, DateTime end) => _inPeriod(start, end);
 }

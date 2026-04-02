@@ -118,6 +118,34 @@ class MonthlyReportService {
       }
     });
 
+    // For gym sessions: count exercises by MuscleGroup, find the top muscle group
+    final gymSessions = sessions.where((s) => s.type == WorkoutType.gym).toList();
+    if (gymSessions.isNotEmpty) {
+      final muscleGroupCount = <MuscleGroup, int>{};
+      int totalGymExercises = 0;
+      for (final s in gymSessions) {
+        if (s.exercises == null) continue;
+        for (final ex in s.exercises!) {
+          muscleGroupCount[ex.muscleGroup] =
+              (muscleGroupCount[ex.muscleGroup] ?? 0) + 1;
+          totalGymExercises++;
+        }
+      }
+      if (totalGymExercises > 0) {
+        MuscleGroup? topMg;
+        int topMgVal = 0;
+        muscleGroupCount.forEach((mg, count) {
+          if (count > topMgVal) {
+            topMgVal = count;
+            topMg = mg;
+          }
+        });
+        if (topMg != null) {
+          topMuscle = topMg!.displayName;
+        }
+      }
+    }
+
     // Previous month
     int prevYear = year;
     int prevMonth = month - 1;
