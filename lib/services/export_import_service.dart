@@ -44,7 +44,7 @@ class ExportImportService {
 
   /// Import workout sessions from a JSON string (user can paste from exported file).
   /// Returns the number of sessions imported.
-  static Future<int> importFromJson(String userId, String json) async {
+  static Future<int> importFromJson(String userId, String json, {void Function(String)? onError}) async {
     final data = jsonDecode(json) as Map<String, dynamic>;
 
     // Validate
@@ -72,7 +72,7 @@ class ExportImportService {
           imported++;
         }
       } catch (e) {
-        // Skip invalid records
+        onError?.call('跳过无效记录 ${map['id'] ?? 'unknown'}: $e');
       }
     }
 
@@ -132,10 +132,13 @@ class ExportImportService {
 
   static WorkoutSession _sessionFromMap(Map<String, dynamic> m) {
     return WorkoutSession(
-      id: m['id'] as String,
-      date: DateTime.parse(m['date'] as String),
-      type: WorkoutType.values.firstWhere((e) => e.name == m['type']),
-      durationSeconds: m['durationSeconds'] as int,
+      id: m['id'] as String? ?? '',
+      date: m['date'] != null ? DateTime.parse(m['date'] as String) : DateTime.now(),
+      type: WorkoutType.values.firstWhere(
+        (e) => e.name == m['type'],
+        orElse: () => WorkoutType.other,
+      ),
+      durationSeconds: m['durationSeconds'] as int? ?? 0,
       heartRateAvg: m['heartRateAvg'] as int?,
       heartRateMax: m['heartRateMax'] as int?,
       calories: m['calories'] as int?,
@@ -156,24 +159,30 @@ class ExportImportService {
 
   static SwimSet _swimSetFromMap(Map<String, dynamic> m) {
     return SwimSet(
-      style: SwimStyle.values.firstWhere((e) => e.name == m['style']),
-      distanceMeters: m['distanceMeters'] as int,
+      style: SwimStyle.values.firstWhere(
+        (e) => e.name == m['style'],
+        orElse: () => SwimStyle.freestyle,
+      ),
+      distanceMeters: m['distanceMeters'] as int? ?? 0,
     );
   }
 
   static GymExercise _exerciseFromMap(Map<String, dynamic> m) {
     return GymExercise(
-      name: m['name'] as String,
-      muscleGroup: MuscleGroup.values.firstWhere((e) => e.name == m['muscleGroup']),
-      sets: (m['sets'] as List).map((gs) => _gymSetFromMap(gs as Map<String, dynamic>)).toList(),
+      name: m['name'] as String? ?? '未知动作',
+      muscleGroup: MuscleGroup.values.firstWhere(
+        (e) => e.name == m['muscleGroup'],
+        orElse: () => MuscleGroup.core,
+      ),
+      sets: (m['sets'] as List?)?.map((gs) => _gymSetFromMap(gs as Map<String, dynamic>)).toList() ?? [],
     );
   }
 
   static GymSet _gymSetFromMap(Map<String, dynamic> m) {
     return GymSet(
-      reps: m['reps'] as int,
-      weight: (m['weight'] as num).toDouble(),
-      durationSeconds: m['durationSeconds'] as int,
+      reps: m['reps'] is int ? m['reps'] as int : 0,
+      weight: (m['weight'] is num) ? (m['weight'] as num).toDouble() : 0.0,
+      durationSeconds: m['durationSeconds'] is int ? m['durationSeconds'] as int : 0,
       isBodyweight: m['isBodyweight'] as bool? ?? false,
     );
   }
