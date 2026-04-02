@@ -121,6 +121,64 @@ class SupabaseService {
     return result.isEmpty ? null : result;
   }
 
+  // ── Gym Exercises ─────────────────────────────────────
+
+  List<Map<String, dynamic>>? _serializeGymExercises(List<GymExercise>? exercises) {
+    if (exercises == null) return null;
+    return exercises.map((ex) => {
+      'name': ex.name,
+      'muscle_group': ex.muscleGroup.name,
+      'sets': ex.sets.map((gs) => {
+        'reps': gs.reps,
+        'weight': gs.weight,
+        'duration_seconds': gs.durationSeconds,
+        'is_bodyweight': gs.isBodyweight,
+      }).toList(),
+    }).toList();
+  }
+
+  List<GymExercise>? _deserializeGymExercises(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is! List) return null;
+
+    final result = <GymExercise>[];
+    for (final ex in raw) {
+      if (ex is! Map) continue;
+      final nameRaw = ex['name'];
+      final mgRaw = ex['muscle_group'];
+      final setsRaw = ex['sets'];
+      if (nameRaw is! String || mgRaw is! String) continue;
+
+      final muscleGroup = MuscleGroup.values.where((e) => e.name == mgRaw).firstOrNull;
+      if (muscleGroup == null) continue;
+
+      final sets = <GymSet>[];
+      if (setsRaw is List) {
+        for (final gs in setsRaw) {
+          if (gs is! Map) continue;
+          final reps = gs['reps'];
+          final weight = gs['weight'];
+          final duration = gs['duration_seconds'];
+          final isBw = gs['is_bodyweight'];
+          sets.add(GymSet(
+            reps: reps is int ? reps : 0,
+            weight: weight is num ? weight.toDouble() : 0.0,
+            durationSeconds: duration is int ? duration : 0,
+            isBodyweight: isBw is bool ? isBw : false,
+          ));
+        }
+      }
+
+      result.add(GymExercise(
+        name: nameRaw,
+        muscleGroup: muscleGroup,
+        sets: sets,
+      ));
+    }
+
+    return result.isEmpty ? null : result;
+  }
+
   /// Sync multiple workout sessions to Supabase in one batch
   Future<void> syncSessions(List<WorkoutSession> sessions) async {
     final userId = uid;
@@ -148,6 +206,7 @@ class SupabaseService {
       'counts_as_workout': s.countsAsWorkout,
       'local_updated_at': DateTime.now().millisecondsSinceEpoch,
       'swim_sets': _serializeSwimSets(s.swimSets),
+      'exercises': _serializeGymExercises(s.exercises),
     }).toList();
 
     await _db.from('workouts').upsert(rows);
@@ -201,6 +260,7 @@ class SupabaseService {
           endDate: row['end_date'] != null
               ? DateTime.parse(row['end_date'] as String)
               : null,
+          exercises: _deserializeGymExercises(row['exercises']),
         );
       }).toList();
     } catch (_) {
