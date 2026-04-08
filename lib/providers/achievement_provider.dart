@@ -120,8 +120,7 @@ class AchievementProvider extends ChangeNotifier {
             case MuscleGroup.core:
               coreCount++;
               break;
-            case MuscleGroup.legs:
-            case MuscleGroup.glutes:
+            case MuscleGroup.glutesAndLegs:
               legsCount++;
               break;
             case MuscleGroup.arms:
@@ -241,8 +240,7 @@ class AchievementProvider extends ChangeNotifier {
         }, 10);
       case AchievementType.legs10:
         return _findMuscleCountDate(sessionsAsc, {
-          MuscleGroup.legs,
-          MuscleGroup.glutes,
+          MuscleGroup.glutesAndLegs,
         }, 10);
       case AchievementType.upperBody10:
         return _findMuscleCountDate(sessionsAsc, {

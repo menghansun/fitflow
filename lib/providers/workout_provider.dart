@@ -53,8 +53,17 @@ class WorkoutProvider extends ChangeNotifier {
   void refresh() => _reload();
 
   Future<void> addSession(WorkoutSession session) async {
-    await _box?.put(session.id, session);
-    SupabaseService.instance.syncSession(session);
+    final box = _box;
+    if (box == null) {
+      debugPrint('Error: Workout box not ready when saving session');
+      return;
+    }
+    await box.put(session.id, session);
+    try {
+      await SupabaseService.instance.syncSession(session);
+    } catch (e) {
+      debugPrint('Cloud sync failed: $e');
+    }
     _reload();
   }
 
@@ -100,18 +109,41 @@ class WorkoutProvider extends ChangeNotifier {
       if (local == null) {
         // Cloud only
         await box.put(cloud.id, cloud);
-      } else if (cloud.type == WorkoutType.gym &&
-                 (local.exercises != null && local.exercises!.isNotEmpty) &&
-                 (cloud.exercises == null || cloud.exercises!.isEmpty)) {
-        // Cloud gym session has no exercises but local does — preserve local
-        // (local has the correct data, cloud was synced before bug was fixed)
       } else {
-        // Default: cloud wins
-        await box.put(cloud.id, cloud);
+        // Local exists — merge carefully to preserve exercises data
+        final merged = _mergeSessions(local, cloud);
+        await box.put(cloud.id, merged);
       }
     }
     // Always reload after cloud sync so achievement unlockedAt can be backfilled
     if (cloudSessions.isNotEmpty) _reload();
+  }
+
+  /// Merge local and cloud session data, preserving exercises if cloud is empty.
+  /// For gym sessions, local exercises data takes priority if cloud has none.
+  WorkoutSession _mergeSessions(WorkoutSession local, WorkoutSession cloud) {
+    if (local.type == WorkoutType.gym &&
+        (local.exercises != null && local.exercises!.isNotEmpty) &&
+        (cloud.exercises == null || cloud.exercises!.isEmpty)) {
+      return cloud.copyWith(
+        heartRateAvg: cloud.heartRateAvg ?? local.heartRateAvg,
+        heartRateMax: cloud.heartRateMax ?? local.heartRateMax,
+        calories: cloud.calories ?? local.calories,
+        swimSets: cloud.swimSets ?? local.swimSets,
+        exercises: local.exercises,
+        poolLengthMeters: cloud.poolLengthMeters ?? local.poolLengthMeters,
+        totalDistanceMeters: cloud.totalDistanceMeters ?? local.totalDistanceMeters,
+        notes: cloud.notes ?? local.notes,
+        durationMinutes: cloud.durationMinutes ?? local.durationMinutes,
+        laps: cloud.laps ?? local.laps,
+        avgPace: cloud.avgPace ?? local.avgPace,
+        swolfAvg: cloud.swolfAvg ?? local.swolfAvg,
+        strokeCount: cloud.strokeCount ?? local.strokeCount,
+        cardioType: cloud.cardioType ?? local.cardioType,
+        endDate: cloud.endDate ?? local.endDate,
+      );
+    }
+    return cloud;
   }
 
   // ── Query helpers ──────────────────────────────────────

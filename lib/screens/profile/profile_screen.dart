@@ -11,6 +11,7 @@ import '../../services/supabase_service.dart';
 import '../gym/exercise_gallery_screen.dart';
 import 'monthly_report_screen.dart';
 import 'achievement_screen.dart';
+import '../body_metrics/body_metrics_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -134,6 +135,23 @@ class ProfileScreen extends StatelessWidget {
               ),
 
               const SizedBox(height: 20),
+              _SectionHeader('健康'),
+
+              _SettingsTile(
+                icon: Icons.monitor_weight_outlined,
+                title: '身体指标',
+                subtitle: '体重、BMI、体脂率、肌肉含量等',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const BodyMetricsScreen(),
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 20),
               _SectionHeader('健身'),
 
               _SettingsTile(
@@ -169,11 +187,19 @@ class ProfileScreen extends StatelessWidget {
                 title: '同步到云端',
                 subtitle: '将本地记录上传到 Supabase',
                 onTap: () async {
-                  await workoutProvider.syncAllToCloud();
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('已同步到云端')),
-                    );
+                  try {
+                    await workoutProvider.syncAllToCloud();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('已同步到云端')),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('同步失败: $e')),
+                      );
+                    }
                   }
                 },
               ),

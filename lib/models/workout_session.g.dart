@@ -329,9 +329,10 @@ class MuscleGroupAdapter extends TypeAdapter<MuscleGroup> {
       case 1:
         return MuscleGroup.back;
       case 2:
-        return MuscleGroup.legs;
+        return MuscleGroup.glutesAndLegs;
       case 3:
-        return MuscleGroup.glutes;
+        // 兼容旧数据 glutes -> glutesAndLegs
+        return MuscleGroup.glutesAndLegs;
       case 4:
         return MuscleGroup.shoulders;
       case 5:
@@ -352,11 +353,8 @@ class MuscleGroupAdapter extends TypeAdapter<MuscleGroup> {
       case MuscleGroup.back:
         writer.writeByte(1);
         break;
-      case MuscleGroup.legs:
+      case MuscleGroup.glutesAndLegs:
         writer.writeByte(2);
-        break;
-      case MuscleGroup.glutes:
-        writer.writeByte(3);
         break;
       case MuscleGroup.shoulders:
         writer.writeByte(4);

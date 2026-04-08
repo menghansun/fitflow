@@ -35,9 +35,7 @@ enum MuscleGroup {
   @HiveField(1)
   back,
   @HiveField(2)
-  legs,
-  @HiveField(3)
-  glutes,
+  glutesAndLegs,
   @HiveField(4)
   shoulders,
   @HiveField(5)
@@ -184,6 +182,50 @@ class WorkoutSession extends HiveObject {
     this.endDate,
   });
 
+  WorkoutSession copyWith({
+    String? id,
+    DateTime? date,
+    WorkoutType? type,
+    int? durationSeconds,
+    int? heartRateAvg,
+    int? heartRateMax,
+    int? calories,
+    List<SwimSet>? swimSets,
+    List<GymExercise>? exercises,
+    int? poolLengthMeters,
+    int? totalDistanceMeters,
+    String? notes,
+    int? durationMinutes,
+    int? laps,
+    String? avgPace,
+    int? swolfAvg,
+    int? strokeCount,
+    String? cardioType,
+    DateTime? endDate,
+  }) {
+    return WorkoutSession(
+      id: id ?? this.id,
+      date: date ?? this.date,
+      type: type ?? this.type,
+      durationSeconds: durationSeconds ?? this.durationSeconds,
+      heartRateAvg: heartRateAvg ?? this.heartRateAvg,
+      heartRateMax: heartRateMax ?? this.heartRateMax,
+      calories: calories ?? this.calories,
+      swimSets: swimSets ?? this.swimSets,
+      exercises: exercises ?? this.exercises,
+      poolLengthMeters: poolLengthMeters ?? this.poolLengthMeters,
+      totalDistanceMeters: totalDistanceMeters ?? this.totalDistanceMeters,
+      notes: notes ?? this.notes,
+      durationMinutes: durationMinutes ?? this.durationMinutes,
+      laps: laps ?? this.laps,
+      avgPace: avgPace ?? this.avgPace,
+      swolfAvg: swolfAvg ?? this.swolfAvg,
+      strokeCount: strokeCount ?? this.strokeCount,
+      cardioType: cardioType ?? this.cardioType,
+      endDate: endDate ?? this.endDate,
+    );
+  }
+
   /// Convenience getter: returns duration in minutes.
   /// For swim sessions uses durationMinutes if set, else converts durationSeconds.
   int get durationInMinutes {
@@ -234,10 +276,8 @@ extension MuscleGroupExt on MuscleGroup {
         return '胸部';
       case MuscleGroup.back:
         return '背部';
-      case MuscleGroup.legs:
-        return '腿部';
-      case MuscleGroup.glutes:
-        return '臀部';
+      case MuscleGroup.glutesAndLegs:
+        return '臀腿';
       case MuscleGroup.shoulders:
         return '肩部';
       case MuscleGroup.arms:
@@ -253,9 +293,7 @@ extension MuscleGroupExt on MuscleGroup {
         return '💪';
       case MuscleGroup.back:
         return '🔙';
-      case MuscleGroup.legs:
-        return '🦵';
-      case MuscleGroup.glutes:
+      case MuscleGroup.glutesAndLegs:
         return '🍑';
       case MuscleGroup.shoulders:
         return '🏋️';

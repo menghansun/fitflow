@@ -8,6 +8,7 @@ import 'services/supabase_service.dart';
 import 'providers/user_provider.dart';
 import 'providers/workout_provider.dart';
 import 'providers/achievement_provider.dart';
+import 'providers/body_metrics_provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/main_screen.dart';
 import 'screens/auth/login_screen.dart';
@@ -41,6 +42,7 @@ class _FitFlowAppState extends State<FitFlowApp> {
         ChangeNotifierProvider(create: (_) => UserProvider()..init()),
         ChangeNotifierProvider(create: (_) => WorkoutProvider()),
         ChangeNotifierProvider(create: (_) => AchievementProvider()),
+        ChangeNotifierProvider(create: (_) => BodyMetricsProvider()),
       ],
       child: StreamBuilder(
         stream: SupabaseService.authStateChanges,
@@ -65,6 +67,8 @@ class _FitFlowAppState extends State<FitFlowApp> {
                   if (_loadedUserId != uid) {
                     _loadedUserId = uid;
                     await context.read<WorkoutProvider>().loadForUser(uid);
+                    if (!context.mounted) return;
+                    await context.read<BodyMetricsProvider>().loadForUser(uid);
                     if (!context.mounted) return;
                     await context.read<AchievementProvider>().init(uid);
                     // 设置成就检查回调
@@ -93,6 +97,8 @@ class _FitFlowAppState extends State<FitFlowApp> {
                       _loadedUserId = newUid;
                       if (context.mounted) {
                         await context.read<WorkoutProvider>().loadForUser(newUid);
+                        if (!context.mounted) return;
+                        await context.read<BodyMetricsProvider>().loadForUser(newUid);
                         if (!context.mounted) return;
                         await context.read<AchievementProvider>().init(newUid);
                         // 设置成就检查回调

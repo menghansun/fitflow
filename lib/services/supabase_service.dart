@@ -182,7 +182,9 @@ class SupabaseService {
   /// Sync multiple workout sessions to Supabase in one batch
   Future<void> syncSessions(List<WorkoutSession> sessions) async {
     final userId = uid;
-    if (userId == null) return;
+    if (userId == null) {
+      throw Exception('Cannot sync: user not logged in (uid is null)');
+    }
 
     final rows = sessions.map((s) => {
       'id': s.id,
