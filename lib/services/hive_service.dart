@@ -14,16 +14,16 @@ class HiveService {
     }
 
     // Adapters
-    Hive.registerAdapter(WorkoutTypeAdapter());
-    Hive.registerAdapter(SwimStyleAdapter());
-    Hive.registerAdapter(MuscleGroupAdapter());
-    Hive.registerAdapter(SwimSetAdapter());
-    Hive.registerAdapter(GymSetAdapter());
-    Hive.registerAdapter(GymExerciseAdapter());
-    Hive.registerAdapter(WorkoutSessionAdapter());
-    Hive.registerAdapter(AppUserAdapter());
-    Hive.registerAdapter(AchievementAdapter());
-    Hive.registerAdapter(BodyMetricsAdapter());
+    if (!Hive.isAdapterRegistered(0)) Hive.registerAdapter(WorkoutTypeAdapter());
+    if (!Hive.isAdapterRegistered(1)) Hive.registerAdapter(SwimStyleAdapter());
+    if (!Hive.isAdapterRegistered(2)) Hive.registerAdapter(MuscleGroupAdapter());
+    if (!Hive.isAdapterRegistered(3)) Hive.registerAdapter(SwimSetAdapter());
+    if (!Hive.isAdapterRegistered(4)) Hive.registerAdapter(GymSetAdapter());
+    if (!Hive.isAdapterRegistered(5)) Hive.registerAdapter(GymExerciseAdapter());
+    if (!Hive.isAdapterRegistered(6)) Hive.registerAdapter(WorkoutSessionAdapter());
+    if (!Hive.isAdapterRegistered(7)) Hive.registerAdapter(AppUserAdapter());
+    if (!Hive.isAdapterRegistered(10)) Hive.registerAdapter(AchievementAdapter());
+    if (!Hive.isAdapterRegistered(11)) Hive.registerAdapter(BodyMetricsAdapter());
 
     // Only open the users box at startup;
     // per-user workout boxes are opened lazily by UserProvider.

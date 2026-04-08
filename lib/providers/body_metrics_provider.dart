@@ -82,6 +82,7 @@ class BodyMetricsProvider extends ChangeNotifier {
   List<MapEntry<DateTime, double>> getWeightTrend(int count) {
     return _records
         .take(count)
+        .toList()
         .reversed
         .where((r) => r.weight != null)
         .map((r) => MapEntry(r.date, r.weight!))
@@ -92,6 +93,7 @@ class BodyMetricsProvider extends ChangeNotifier {
   List<MapEntry<DateTime, double>> getBmiTrend(int count) {
     return _records
         .take(count)
+        .toList()
         .reversed
         .where((r) => r.bmi != null)
         .map((r) => MapEntry(r.date, r.bmi!))
@@ -102,6 +104,7 @@ class BodyMetricsProvider extends ChangeNotifier {
   List<MapEntry<DateTime, double>> getBodyFatTrend(int count) {
     return _records
         .take(count)
+        .toList()
         .reversed
         .where((r) => r.bodyFatPercentage != null)
         .map((r) => MapEntry(r.date, r.bodyFatPercentage!))
@@ -112,6 +115,7 @@ class BodyMetricsProvider extends ChangeNotifier {
   List<MapEntry<DateTime, double>> getMuscleMassTrend(int count) {
     return _records
         .take(count)
+        .toList()
         .reversed
         .where((r) => r.muscleMass != null)
         .map((r) => MapEntry(r.date, r.muscleMass!))

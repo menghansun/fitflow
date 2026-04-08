@@ -8,7 +8,7 @@ part of 'body_metrics.dart';
 
 class BodyMetricsAdapter extends TypeAdapter<BodyMetrics> {
   @override
-  final int typeId = 7;
+  final int typeId = 11;
 
   @override
   BodyMetrics read(BinaryReader reader) {

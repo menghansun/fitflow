@@ -196,7 +196,7 @@ class _BodyMetricsScreenState extends State<BodyMetricsScreen> {
     }
 
     final spots = data.asMap().entries.map((e) {
-      return FlSpot(e.key.toDouble(), e.value.$2);
+      return FlSpot(e.key.toDouble(), e.value.value);
     }).toList();
 
     final minY = spots.map((s) => s.y).reduce((a, b) => a < b ? a : b);
@@ -241,7 +241,7 @@ class _BodyMetricsScreenState extends State<BodyMetricsScreen> {
                 getTitlesWidget: (value, meta) {
                   final index = value.toInt();
                   if (index < 0 || index >= data.length) return const SizedBox();
-                  final date = data[index].$1;
+                  final date = data[index].key;
                   return Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(

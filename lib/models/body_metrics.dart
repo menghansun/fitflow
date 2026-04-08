@@ -2,7 +2,7 @@ import 'package:hive/hive.dart';
 
 part 'body_metrics.g.dart';
 
-@HiveType(typeId: 7)
+@HiveType(typeId: 11)
 class BodyMetrics extends HiveObject {
   @HiveField(0)
   late String id;

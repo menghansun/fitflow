@@ -7,6 +7,7 @@ import '../../providers/user_provider.dart';
 import '../../widgets/session_card.dart';
 import '../../services/motivation_service.dart';
 import '../session_detail_screen.dart';
+import '../body_metrics/body_metrics_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -61,7 +62,12 @@ class HomeScreen extends StatelessWidget {
                         ),
                         // ── 用户头像入口 ──
                         GestureDetector(
-                          onTap: () => Navigator.pushNamed(context, '/profile'),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const BodyMetricsScreen(),
+                            ),
+                          ),
                           child: Container(
                             width: 48,
                             height: 48,
