@@ -392,83 +392,89 @@ class _UserHeader extends StatelessWidget {
     final primary = theme.colorScheme.primary;
     final isDark = theme.brightness == Brightness.dark;
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isDark
-              ? [primary.withValues(alpha:0.25), primary.withValues(alpha:0.1)]
-              : [primary.withValues(alpha:0.12), primary.withValues(alpha:0.04)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: primary.withValues(alpha:0.15)),
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const BodyMetricsScreen()),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: primary.withValues(alpha: isDark ? 0.3 : 0.2),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: primary.withValues(alpha:0.3),
-                width: 2,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isDark
+                ? [primary.withValues(alpha:0.25), primary.withValues(alpha:0.1)]
+                : [primary.withValues(alpha:0.12), primary.withValues(alpha:0.04)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: primary.withValues(alpha:0.15)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: primary.withValues(alpha: isDark ? 0.3 : 0.2),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: primary.withValues(alpha:0.3),
+                  width: 2,
+                ),
+              ),
+              child: Center(
+                child: Text(user.avatarEmoji ?? '💪',
+                    style: const TextStyle(fontSize: 32)),
               ),
             ),
-            child: Center(
-              child: Text(user.avatarEmoji ?? '💪',
-                  style: const TextStyle(fontSize: 32)),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  user.nickname,
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    user.nickname,
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '加入 FitFlow ${_daysSince(user.createdAt)} 天',
-                  style: TextStyle(
-                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                    fontSize: 13,
+                  const SizedBox(height: 4),
+                  Text(
+                    '加入 FitFlow ${_daysSince(user.createdAt)} 天',
+                    style: TextStyle(
+                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                      fontSize: 13,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: primary.withValues(alpha:0.12),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.verified, color: primary, size: 14),
-                const SizedBox(width: 4),
-                Text(
-                  '会员',
-                  style: TextStyle(
-                    color: primary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: primary.withValues(alpha:0.12),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.verified, color: primary, size: 14),
+                  const SizedBox(width: 4),
+                  Text(
+                    '会员',
+                    style: TextStyle(
+                      color: primary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-              ],
+                ],
             ),
           ),
         ],
       ),
+    ),
     );
   }
 

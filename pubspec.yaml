@@ -62,3 +62,5 @@ flutter:
     - assets/exercises/
     - assets/splash.gif
     - assets/achievement/
+    - assets/body_front.jpeg
+    - assets/body_back.jpeg

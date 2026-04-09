@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/workout_session.dart';
+import '../models/body_metrics.dart';
 
 class SupabaseService {
   SupabaseService._();
@@ -276,5 +277,64 @@ class SupabaseService {
     } catch (_) {
       return [];
     }
+  }
+
+  // ── Body Metrics ────────────────────────────────────────
+
+  /// Sync body metrics records to Supabase
+  Future<void> syncBodyMetrics(List<BodyMetrics> records) async {
+    final userId = uid;
+    if (userId == null) {
+      throw Exception('Cannot sync: user not logged in (uid is null)');
+    }
+
+    final rows = records.map((r) => {
+      'id': r.id,
+      'user_id': userId,
+      'date': r.date.toIso8601String(),
+      'weight': r.weight,
+      'height': r.height,
+      'body_fat_percentage': r.bodyFatPercentage,
+      'muscle_mass': r.muscleMass,
+      'basal_metabolic_rate': r.basalMetabolicRate,
+      'notes': r.notes,
+    }).toList();
+
+    await _db.from('body_metrics').upsert(rows);
+  }
+
+  /// Fetch all cloud body metrics for current user
+  Future<List<BodyMetrics>> fetchBodyMetrics() async {
+    final userId = uid;
+    if (userId == null) return [];
+
+    try {
+      final res = await _db
+          .from('body_metrics')
+          .select()
+          .eq('user_id', userId)
+          .order('date', ascending: false);
+      return (res as List).map((row) {
+        return BodyMetrics(
+          id: row['id'] as String,
+          date: DateTime.parse(row['date'] as String),
+          weight: (row['weight'] as num?)?.toDouble(),
+          height: (row['height'] as num?)?.toDouble(),
+          bodyFatPercentage: (row['body_fat_percentage'] as num?)?.toDouble(),
+          muscleMass: (row['muscle_mass'] as num?)?.toDouble(),
+          basalMetabolicRate: row['basal_metabolic_rate'] as int?,
+          notes: row['notes'] as String?,
+        );
+      }).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Delete a body metrics record from Supabase
+  Future<void> deleteBodyMetrics(String id) async {
+    final userId = uid;
+    if (userId == null) return;
+    await _db.from('body_metrics').delete().eq('id', id).eq('user_id', userId);
   }
 }

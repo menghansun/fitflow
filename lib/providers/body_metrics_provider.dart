@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 import '../models/body_metrics.dart';
+import '../services/supabase_service.dart';
 
 class BodyMetricsProvider extends ChangeNotifier {
   final Uuid _uuid = const Uuid();
@@ -28,6 +29,8 @@ class BodyMetricsProvider extends ChangeNotifier {
       await Hive.openBox<BodyMetrics>(boxName);
     }
     _reload();
+    // 加载后同步云端数据
+    await syncFromCloud();
   }
 
   Box<BodyMetrics>? get _box {
@@ -47,12 +50,45 @@ class BodyMetricsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 从云端同步数据
+  Future<void> syncFromCloud() async {
+    try {
+      final cloudRecords = await SupabaseService.instance.fetchBodyMetrics();
+      final box = _box;
+      if (box == null || cloudRecords.isEmpty) return;
+
+      // 合并云端和本地数据，以最新更新的为准
+      for (final record in cloudRecords) {
+        final local = box.get(record.id);
+        if (local == null) {
+          box.put(record.id, record);
+        } else {
+          // 用云端数据覆盖本地
+          box.put(record.id, record);
+        }
+      }
+      _reload();
+    } catch (_) {
+      // 云端同步失败不阻塞
+    }
+  }
+
+  /// 同步所有数据到云端
+  Future<void> syncAllToCloud() async {
+    if (_records.isEmpty) return;
+    await SupabaseService.instance.syncBodyMetrics(_records);
+  }
+
   /// 添加记录
   Future<void> addRecord(BodyMetrics record) async {
     final box = _box;
     if (box == null) return;
     await box.put(record.id, record);
     _reload();
+    // 同步到云端
+    try {
+      await SupabaseService.instance.syncBodyMetrics([record]);
+    } catch (_) {}
   }
 
   /// 更新记录
@@ -61,6 +97,10 @@ class BodyMetricsProvider extends ChangeNotifier {
     if (box == null) return;
     await box.put(record.id, record);
     _reload();
+    // 同步到云端
+    try {
+      await SupabaseService.instance.syncBodyMetrics([record]);
+    } catch (_) {}
   }
 
   /// 删除记录
@@ -68,6 +108,7 @@ class BodyMetricsProvider extends ChangeNotifier {
     final box = _box;
     if (box == null) return;
     await box.delete(id);
+    await SupabaseService.instance.deleteBodyMetrics(id);
     _reload();
   }
 
