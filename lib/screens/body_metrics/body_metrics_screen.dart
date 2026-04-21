@@ -1,9 +1,11 @@
+﻿import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../../models/body_metrics.dart';
 import '../../providers/body_metrics_provider.dart';
+import '../../providers/user_provider.dart';
 import '../../theme/app_theme.dart';
 
 class BodyMetricsScreen extends StatefulWidget {
@@ -30,17 +32,18 @@ class _BodyMetricsScreenState extends State<BodyMetricsScreen> {
         backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
         elevation: 0,
       ),
-      body: Consumer<BodyMetricsProvider>(
-        builder: (context, provider, _) {
+      body: Consumer2<BodyMetricsProvider, UserProvider>(
+        builder: (context, provider, userProvider, _) {
           if (provider.records.isEmpty) {
             return _buildEmptyState(context);
           }
+          final userHeight = userProvider.currentUser?.height;
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildBodyDiagram(provider),
+                _buildBodyDiagram(provider, userHeight),
                 const SizedBox(height: 24),
                 _buildMetricSelector(),
                 const SizedBox(height: 16),
@@ -75,7 +78,7 @@ class _BodyMetricsScreenState extends State<BodyMetricsScreen> {
     );
   }
 
-  Widget _buildBodyDiagram(BodyMetricsProvider provider) {
+  Widget _buildBodyDiagram(BodyMetricsProvider provider, double? userHeight) {
     final latest = provider.latest;
     if (latest == null) return const SizedBox();
 
@@ -153,6 +156,10 @@ class _BodyMetricsScreenState extends State<BodyMetricsScreen> {
                   children: [
                     _buildBodyMetricRow('体重', latest.weight != null ? '${latest.weight!.toStringAsFixed(1)} kg' : '--', AppColors.gymAccent),
                     const SizedBox(height: 8),
+                    if (userHeight != null) ...[
+                      _buildBodyMetricRow('身高', '${userHeight.toStringAsFixed(1)} cm', Colors.teal),
+                      const SizedBox(height: 8),
+                    ],
                     _buildBodyMetricRow('BMI', latest.bmi != null ? latest.bmi!.toStringAsFixed(1) : '--', Colors.blue),
                     const SizedBox(height: 8),
                     _buildBodyMetricRow('体脂率', latest.bodyFatPercentage != null ? '${latest.bodyFatPercentage!.toStringAsFixed(1)}%' : '--', Colors.orange),
@@ -246,24 +253,25 @@ class _BodyMetricsScreenState extends State<BodyMetricsScreen> {
     List<MapEntry<DateTime, double>> data;
     String unit;
     Color lineColor = AppColors.gymAccent;
+    const maxDisplayCount = 5;
 
     switch (_selectedMetric) {
       case 'weight':
-        data = provider.getWeightTrend(30);
+        data = provider.getWeightTrend(maxDisplayCount);
         unit = 'kg';
         break;
       case 'bmi':
-        data = provider.getBmiTrend(30);
+        data = provider.getBmiTrend(maxDisplayCount);
         unit = '';
         lineColor = Colors.blue;
         break;
       case 'bodyFat':
-        data = provider.getBodyFatTrend(30);
+        data = provider.getBodyFatTrend(maxDisplayCount);
         unit = '%';
         lineColor = Colors.orange;
         break;
       case 'muscle':
-        data = provider.getMuscleMassTrend(30);
+        data = provider.getMuscleMassTrend(maxDisplayCount);
         unit = 'kg';
         lineColor = Colors.green;
         break;
@@ -283,22 +291,31 @@ class _BodyMetricsScreenState extends State<BodyMetricsScreen> {
       );
     }
 
-    final spots = data.asMap().entries.map((e) {
-      return FlSpot(e.key.toDouble(), e.value.value);
-    }).toList();
-
-    final minY = spots.map((s) => s.y).reduce((a, b) => a < b ? a : b);
-    final maxY = spots.map((s) => s.y).reduce((a, b) => a > b ? a : b);
-    final padding = (maxY - minY) * 0.1;
-
-    // 计算唯一日期用于显示
-    final uniqueDates = <String, DateTime>{};
-    for (final entry in data) {
-      final key = _dateFormat.format(entry.key);
-      if (!uniqueDates.containsKey(key)) {
-        uniqueDates[key] = entry.key;
-      }
+    final dataMin = data.map((e) => e.value).reduce((a, b) => a < b ? a : b);
+    final dataMax = data.map((e) => e.value).reduce((a, b) => a > b ? a : b);
+    final dataRange = (dataMax - dataMin).abs();
+    final rawInterval = dataRange == 0 ? 1.0 : dataRange / 3;
+    double yInterval;
+    if (rawInterval <= 0.5) {
+      yInterval = 0.5;
+    } else if (rawInterval <= 1) {
+      yInterval = 1;
+    } else if (rawInterval <= 2) {
+      yInterval = 2;
+    } else if (rawInterval <= 5) {
+      yInterval = 5;
+    } else if (rawInterval <= 10) {
+      yInterval = 10;
+    } else {
+      yInterval = (rawInterval / 10).ceilToDouble() * 10;
     }
+    final minY = (dataMin / yInterval).floor() * yInterval;
+    final maxY = (dataMax / yInterval).ceil() * yInterval;
+    final minX = data.length == 1 ? -0.5 : 0.0;
+    final maxX = data.length == 1 ? 0.5 : (data.length - 1).toDouble();
+    final spots = data.asMap().entries
+        .map((e) => FlSpot(e.key.toDouble(), e.value.value))
+        .toList();
 
     return Container(
       height: 200,
@@ -308,105 +325,154 @@ class _BodyMetricsScreenState extends State<BodyMetricsScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: LineChart(
-        LineChartData(
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            horizontalInterval: (maxY - minY) / 4,
-            getDrawingHorizontalLine: (value) => FlLine(
-              color: Colors.grey[200]!,
-              strokeWidth: 1,
-            ),
-          ),
-          titlesData: FlTitlesData(
-            leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 40,
-                interval: (maxY - minY) / 4,
-                getTitlesWidget: (value, meta) {
-                  return Text(
-                    '${value.toStringAsFixed(1)}$unit',
-                    style: TextStyle(fontSize: 10, color: Colors.grey[600]),
-                  );
-                },
-              ),
-            ),
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 32,
-                interval: 1,
-                getTitlesWidget: (value, meta) {
-                  final index = value.toInt();
-                  if (index < 0 || index >= data.length) return const SizedBox();
-                  final date = data[index].key;
-                  final dateKey = _dateFormat.format(date);
-                  // 只在当前日期与前一个不同时显示标签
-                  if (index > 0) {
-                    final prevDateKey = _dateFormat.format(data[index - 1].key);
-                    if (dateKey == prevDateKey) return const SizedBox();
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      dateKey,
-                      style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final chartSize = Size(constraints.maxWidth, constraints.maxHeight);
+          final axisTextStyle = TextStyle(fontSize: 10, color: Colors.grey[600]);
+          final textDirection = Directionality.of(context);
+          final yLabels = <String>[
+            for (double value = minY; value <= maxY + 0.001; value += yInterval)
+              '${value.toStringAsFixed(1)}$unit',
+          ];
+          final maxYLabelWidth = yLabels
+              .map((label) {
+                final painter = TextPainter(
+                  text: TextSpan(text: label, style: axisTextStyle),
+                  maxLines: 1,
+                  textDirection: textDirection,
+                )..layout();
+                return painter.width;
+              })
+              .fold<double>(0, (maxWidth, width) => width > maxWidth ? width : maxWidth);
+          final datePainter = TextPainter(
+            text: TextSpan(text: _dateFormat.format(data.first.key), style: axisTextStyle),
+            maxLines: 1,
+            textDirection: textDirection,
+          )..layout();
+          const leftInset = 30.0;
+          const topInset = 24.0;
+          final rightAxis = maxYLabelWidth + 14;
+          final bottomAxis = datePainter.height + 14;
+          return Transform.translate(
+            offset: const Offset(10, 10),
+            child: SizedBox(
+              width: chartSize.width,
+              height: chartSize.height,
+              child: LineChart(
+                LineChartData(
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    horizontalInterval: yInterval,
+                    getDrawingHorizontalLine: (value) => FlLine(
+                      color: Colors.grey[200]!,
+                      strokeWidth: 1,
                     ),
-                  );
-                },
+                  ),
+                  titlesData: FlTitlesData(
+                    leftTitles: const AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: false,
+                        reservedSize: leftInset,
+                      ),
+                    ),
+                    rightTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: rightAxis,
+                        interval: yInterval,
+                        getTitlesWidget: (value, meta) {
+                          return Transform.translate(
+                            offset: const Offset(10, 0),
+                            child: Text(
+                              '${value.toStringAsFixed(1)}$unit',
+                              style: axisTextStyle,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    topTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: false,
+                        reservedSize: topInset,
+                      ),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: bottomAxis,
+                        interval: 1,
+                        getTitlesWidget: (value, meta) {
+                          final index = value.toInt();
+                          if (index >= 0 && index < data.length) {
+                            final date = data[index].key;
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                _dateFormat.format(date),
+                                style: axisTextStyle,
+                              ),
+                            );
+                          }
+                          return const SizedBox();
+                        },
+                      ),
+                    ),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  minX: minX,
+                  maxX: maxX,
+                  minY: minY,
+                  maxY: maxY,
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: spots,
+                      isCurved: false,
+                      color: lineColor,
+                      barWidth: 2,
+                      dotData: FlDotData(
+                        show: true,
+                        getDotPainter: (spot, percent, barData, index) {
+                          return _MetricDotPainter(
+                            label: data[index].value.toStringAsFixed(1),
+                            color: lineColor,
+                          );
+                        },
+                      ),
+                      belowBarData: BarAreaData(
+                        show: true,
+                        color: lineColor.withValues(alpha: 0.1),
+                      ),
+                    ),
+                  ],
+                  lineTouchData: const LineTouchData(enabled: false),
+                ),
               ),
             ),
-          ),
-          borderData: FlBorderData(show: false),
-          minY: minY - padding,
-          maxY: maxY + padding,
-          lineBarsData: [
-            LineChartBarData(
-              spots: spots,
-              isCurved: true,
-              color: lineColor,
-              barWidth: 3,
-              dotData: const FlDotData(show: false),
-              belowBarData: BarAreaData(
-                show: true,
-                color: lineColor.withValues(alpha:0.1),
-              ),
-            ),
-          ],
-          lineTouchData: LineTouchData(
-            touchTooltipData: LineTouchTooltipData(
-              getTooltipItems: (touchedSpots) {
-                return touchedSpots.map((spot) {
-                  return LineTooltipItem(
-                    '${spot.y.toStringAsFixed(1)}$unit',
-                    const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                  );
-                }).toList();
-              },
-            ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
-
   Widget _buildHistoryList(BodyMetricsProvider provider) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('历史记录', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
-        ...provider.records.map((record) => _buildHistoryItem(record)),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: provider.records.length,
+          itemBuilder: (context, index) => _buildHistoryItem(provider.records[index]),
+        ),
       ],
     );
   }
@@ -465,6 +531,111 @@ class _BodyMetricsScreenState extends State<BodyMetricsScreen> {
     );
   }
 
+  Future<DateTime?> _showStyledDatePicker(
+    BuildContext context, {
+    required DateTime initialDate,
+  }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primary = AppColors.gymAccent;
+    final onPrimary = Colors.white;
+    final surface = isDark ? AppColors.darkSurface : Colors.white;
+    final onSurface = isDark ? AppColors.lightText : AppColors.darkText;
+    final muted = (theme.textTheme.bodyMedium?.color ?? onSurface)
+        .withValues(alpha: 0.65);
+
+    return showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+      locale: const Locale('zh', 'CN'),
+      helpText: '选择日期',
+      cancelText: '取消',
+      confirmText: '确定',
+      builder: (context, child) {
+        final styledTheme = theme.copyWith(
+          colorScheme: theme.colorScheme.copyWith(
+            primary: primary,
+            onPrimary: onPrimary,
+            surface: surface,
+            onSurface: onSurface,
+          ),
+          dialogTheme: DialogThemeData(
+            backgroundColor: surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(28),
+            ),
+          ),
+          datePickerTheme: DatePickerThemeData(
+            backgroundColor: surface,
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(28),
+            ),
+            headerBackgroundColor: surface,
+            headerForegroundColor: onSurface,
+            headerHeadlineStyle: const TextStyle(
+              fontSize: 0,
+              height: 0,
+              color: Colors.transparent,
+            ),
+            headerHelpStyle: theme.textTheme.titleMedium?.copyWith(
+              color: onSurface,
+              fontWeight: FontWeight.w700,
+            ),
+            weekdayStyle: theme.textTheme.bodyMedium?.copyWith(
+              color: onSurface.withValues(alpha: 0.72),
+              fontWeight: FontWeight.w700,
+            ),
+            dayStyle: theme.textTheme.titleMedium?.copyWith(
+              color: onSurface,
+              fontWeight: FontWeight.w600,
+            ),
+            yearStyle: theme.textTheme.titleMedium?.copyWith(
+              color: onSurface,
+              fontWeight: FontWeight.w600,
+            ),
+            todayForegroundColor: MaterialStatePropertyAll(primary),
+            todayBorder: BorderSide(color: primary, width: 1.5),
+            dayForegroundColor: MaterialStateProperty.resolveWith((states) {
+              if (states.contains(MaterialState.selected)) return onPrimary;
+              if (states.contains(MaterialState.disabled)) {
+                return muted.withValues(alpha: 0.5);
+              }
+              return onSurface;
+            }),
+            dayBackgroundColor: MaterialStateProperty.resolveWith((states) {
+              if (states.contains(MaterialState.selected)) return primary;
+              return Colors.transparent;
+            }),
+            yearForegroundColor: MaterialStateProperty.resolveWith((states) {
+              if (states.contains(MaterialState.selected)) return onPrimary;
+              return onSurface;
+            }),
+            yearBackgroundColor: MaterialStateProperty.resolveWith((states) {
+              if (states.contains(MaterialState.selected)) return primary;
+              return primary.withValues(alpha: 0.08);
+            }),
+            cancelButtonStyle: TextButton.styleFrom(
+              foregroundColor: muted,
+              textStyle: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            confirmButtonStyle: TextButton.styleFrom(
+              foregroundColor: primary,
+              textStyle: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        );
+
+        return Theme(
+          data: styledTheme,
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
+    );
+  }
+
   void _confirmDelete(BodyMetrics record) {
     showDialog(
       context: context,
@@ -491,14 +662,17 @@ class _BodyMetricsScreenState extends State<BodyMetricsScreen> {
   void _showAddDialog(BuildContext context) {
     final provider = context.read<BodyMetricsProvider>();
     DateTime selectedDate = DateTime.now();
-    TimeOfDay selectedTime = TimeOfDay.now();
+    bool isSaving = false;
 
     double? weight;
-    double? height;
     double? bodyFat;
     double? muscle;
     int? bmr;
     final notesCtrl = TextEditingController();
+    final weightCtrl = TextEditingController();
+    final bodyFatCtrl = TextEditingController();
+    final muscleCtrl = TextEditingController();
+    final bmrCtrl = TextEditingController();
 
     showModalBottomSheet(
       context: context,
@@ -523,74 +697,38 @@ class _BodyMetricsScreenState extends State<BodyMetricsScreen> {
                     children: [
                       const Text('添加测量记录', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 20),
-                      // 日期时间选择
-                      Row(
-                        children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () async {
-                                final date = await showDatePicker(
-                                  context: ctx,
-                                  initialDate: selectedDate,
-                                  firstDate: DateTime(2000),
-                                  lastDate: DateTime.now(),
-                                );
-                                if (date != null) {
-                                  setState(() => selectedDate = date);
-                                }
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: Colors.grey[300]!),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.calendar_today, size: 18),
-                                    const SizedBox(width: 8),
-                                    Text('${selectedDate.year}/${selectedDate.month.toString().padLeft(2, '0')}/${selectedDate.day.toString().padLeft(2, '0')}'),
-                                  ],
-                                ),
-                              ),
-                            ),
+                      // 日期选择
+                      GestureDetector(
+                        onTap: () async {
+                          final date = await _showStyledDatePicker(
+                            ctx,
+                            initialDate: selectedDate,
+                          );
+                          if (date != null) {
+                            setState(() => selectedDate = date);
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey[300]!),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () async {
-                                final time = await showTimePicker(
-                                  context: ctx,
-                                  initialTime: selectedTime,
-                                );
-                                if (time != null) {
-                                  setState(() => selectedTime = time);
-                                }
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: Colors.grey[300]!),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.access_time, size: 18),
-                                    const SizedBox(width: 8),
-                                    Text('${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}'),
-                                  ],
-                                ),
-                              ),
-                            ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.calendar_today, size: 18),
+                              const SizedBox(width: 8),
+                              Text('${selectedDate.year}/${selectedDate.month.toString().padLeft(2, '0')}/${selectedDate.day.toString().padLeft(2, '0')}'),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                       const SizedBox(height: 16),
-                      _buildInputField('体重 (kg)', (v) => weight = double.tryParse(v)),
-                      _buildInputField('身高 (cm)', (v) => height = double.tryParse(v)),
-                      _buildInputField('体脂率 (%)', (v) => bodyFat = double.tryParse(v)),
-                      _buildInputField('肌肉含量 (kg)', (v) => muscle = double.tryParse(v)),
-                      _buildInputField('基础代谢 (kcal)', (v) => bmr = int.tryParse(v)),
+                      _buildInputField('体重 (kg)', weightCtrl, (v) => weight = double.tryParse(v)),
+                      _buildInputField('体脂率 (%)', bodyFatCtrl, (v) => bodyFat = double.tryParse(v)),
+                      _buildInputField('肌肉含量 (kg)', muscleCtrl, (v) => muscle = double.tryParse(v)),
+                      _buildBmrInputField(bmrCtrl, (v) => bmr = int.tryParse(v.replaceAll(RegExp(r'[^\d]'), ''))),
+                      const SizedBox(height: 20),
                       TextField(
                         controller: notesCtrl,
                         decoration: InputDecoration(
@@ -602,39 +740,40 @@ class _BodyMetricsScreenState extends State<BodyMetricsScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: () {
-                            if (weight == null && bodyFat == null && muscle == null && bmr == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('请至少填写一项指标')),
-                              );
-                              return;
-                            }
-                            final dateTime = DateTime(
-                              selectedDate.year,
-                              selectedDate.month,
-                              selectedDate.day,
-                              selectedTime.hour,
-                              selectedTime.minute,
-                            );
-                            final record = BodyMetrics(
-                              id: provider.generateId(),
-                              date: dateTime,
-                              weight: weight,
-                              height: height,
-                              bodyFatPercentage: bodyFat,
-                              muscleMass: muscle,
-                              basalMetabolicRate: bmr,
-                              notes: notesCtrl.text.isEmpty ? null : notesCtrl.text,
-                            );
-                            provider.addRecord(record);
-                            Navigator.pop(ctx);
-                          },
+                          onPressed: isSaving
+                              ? null
+                              : () async {
+                                  if (weight == null && bodyFat == null && muscle == null && bmr == null) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('请至少填写一项指标')),
+                                    );
+                                    return;
+                                  }
+                                  setState(() => isSaving = true);
+                                  final dateTime = DateTime(
+                                    selectedDate.year,
+                                    selectedDate.month,
+                                    selectedDate.day,
+                                  );
+                                  final record = BodyMetrics(
+                                    id: provider.generateId(),
+                                    date: dateTime,
+                                    weight: weight,
+                                    height: ctx.read<UserProvider>().currentUser?.height,
+                                    bodyFatPercentage: bodyFat,
+                                    muscleMass: muscle,
+                                    basalMetabolicRate: bmr,
+                                    notes: notesCtrl.text.isEmpty ? null : notesCtrl.text,
+                                  );
+                                  provider.addRecord(record);
+                                  Navigator.pop(ctx);
+                                },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.gymAccent,
+                            backgroundColor: isSaving ? Colors.grey : AppColors.gymAccent,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
-                          child: const Text('保存', style: TextStyle(color: Colors.white, fontSize: 16)),
+                          child: Text(isSaving ? '保存中...' : '保存', style: const TextStyle(color: Colors.white, fontSize: 16)),
                         ),
                       ),
                     ],
@@ -651,14 +790,17 @@ class _BodyMetricsScreenState extends State<BodyMetricsScreen> {
   void _showEditDialog(BuildContext context, BodyMetrics record) {
     final provider = context.read<BodyMetricsProvider>();
     DateTime selectedDate = record.date;
-    TimeOfDay selectedTime = TimeOfDay.fromDateTime(record.date);
+    bool isSaving = false;
 
     double? weight = record.weight;
-    double? height = record.height;
     double? bodyFat = record.bodyFatPercentage;
     double? muscle = record.muscleMass;
     int? bmr = record.basalMetabolicRate;
     final notesCtrl = TextEditingController(text: record.notes ?? '');
+    final weightCtrl = TextEditingController(text: record.weight?.toString() ?? '');
+    final bodyFatCtrl = TextEditingController(text: record.bodyFatPercentage?.toString() ?? '');
+    final muscleCtrl = TextEditingController(text: record.muscleMass?.toString() ?? '');
+    final bmrCtrl = TextEditingController(text: record.basalMetabolicRate?.toString() ?? '');
 
     showModalBottomSheet(
       context: context,
@@ -683,74 +825,38 @@ class _BodyMetricsScreenState extends State<BodyMetricsScreen> {
                     children: [
                       const Text('编辑测量记录', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 20),
-                      // 日期时间选择
-                      Row(
-                        children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () async {
-                                final date = await showDatePicker(
-                                  context: ctx,
-                                  initialDate: selectedDate,
-                                  firstDate: DateTime(2000),
-                                  lastDate: DateTime.now(),
-                                );
-                                if (date != null) {
-                                  setState(() => selectedDate = date);
-                                }
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: Colors.grey[300]!),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.calendar_today, size: 18),
-                                    const SizedBox(width: 8),
-                                    Text('${selectedDate.year}/${selectedDate.month.toString().padLeft(2, '0')}/${selectedDate.day.toString().padLeft(2, '0')}'),
-                                  ],
-                                ),
-                              ),
-                            ),
+                      // 日期选择
+                      GestureDetector(
+                        onTap: () async {
+                          final date = await _showStyledDatePicker(
+                            ctx,
+                            initialDate: selectedDate,
+                          );
+                          if (date != null) {
+                            setState(() => selectedDate = date);
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey[300]!),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () async {
-                                final time = await showTimePicker(
-                                  context: ctx,
-                                  initialTime: selectedTime,
-                                );
-                                if (time != null) {
-                                  setState(() => selectedTime = time);
-                                }
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: Colors.grey[300]!),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.access_time, size: 18),
-                                    const SizedBox(width: 8),
-                                    Text('${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}'),
-                                  ],
-                                ),
-                              ),
-                            ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.calendar_today, size: 18),
+                              const SizedBox(width: 8),
+                              Text('${selectedDate.year}/${selectedDate.month.toString().padLeft(2, '0')}/${selectedDate.day.toString().padLeft(2, '0')}'),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                       const SizedBox(height: 16),
-                      _buildInputField('体重 (kg)', (v) => weight = double.tryParse(v)),
-                      _buildInputField('身高 (cm)', (v) => height = double.tryParse(v)),
-                      _buildInputField('体脂率 (%)', (v) => bodyFat = double.tryParse(v)),
-                      _buildInputField('肌肉含量 (kg)', (v) => muscle = double.tryParse(v)),
-                      _buildInputField('基础代谢 (kcal)', (v) => bmr = int.tryParse(v)),
+                      _buildInputField('体重 (kg)', weightCtrl, (v) => weight = double.tryParse(v)),
+                      _buildInputField('体脂率 (%)', bodyFatCtrl, (v) => bodyFat = double.tryParse(v)),
+                      _buildInputField('肌肉含量 (kg)', muscleCtrl, (v) => muscle = double.tryParse(v)),
+                      _buildBmrInputField(bmrCtrl, (v) => bmr = int.tryParse(v.replaceAll(RegExp(r'[^\d]'), ''))),
+                      const SizedBox(height: 16),
                       TextField(
                         controller: notesCtrl,
                         decoration: InputDecoration(
@@ -762,38 +868,38 @@ class _BodyMetricsScreenState extends State<BodyMetricsScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: () {
-                            if (weight == null && bodyFat == null && muscle == null && bmr == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('请至少填写一项指标')),
-                              );
-                              return;
-                            }
-                            final dateTime = DateTime(
-                              selectedDate.year,
-                              selectedDate.month,
-                              selectedDate.day,
-                              selectedTime.hour,
-                              selectedTime.minute,
-                            );
-                            final updated = record.copyWith(
-                              date: dateTime,
-                              weight: weight,
-                              height: height,
-                              bodyFatPercentage: bodyFat,
-                              muscleMass: muscle,
-                              basalMetabolicRate: bmr,
-                              notes: notesCtrl.text.isEmpty ? null : notesCtrl.text,
-                            );
-                            provider.updateRecord(updated);
-                            Navigator.pop(ctx);
-                          },
+                          onPressed: isSaving
+                              ? null
+                              : () async {
+                                  if (weight == null && bodyFat == null && muscle == null && bmr == null) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('请至少填写一项指标')),
+                                    );
+                                    return;
+                                  }
+                                  setState(() => isSaving = true);
+                                  final dateTime = DateTime(
+                                    selectedDate.year,
+                                    selectedDate.month,
+                                    selectedDate.day,
+                                  );
+                                  final updated = record.copyWith(
+                                    date: dateTime,
+                                    weight: weight,
+                                    bodyFatPercentage: bodyFat,
+                                    muscleMass: muscle,
+                                    basalMetabolicRate: bmr,
+                                    notes: notesCtrl.text.isEmpty ? null : notesCtrl.text,
+                                  );
+                                  provider.updateRecord(updated);
+                                  Navigator.pop(ctx);
+                                },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.gymAccent,
+                            backgroundColor: isSaving ? Colors.grey : AppColors.gymAccent,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
-                          child: const Text('保存', style: TextStyle(color: Colors.white, fontSize: 16)),
+                          child: Text(isSaving ? '保存中...' : '保存', style: const TextStyle(color: Colors.white, fontSize: 16)),
                         ),
                       ),
                     ],
@@ -807,10 +913,11 @@ class _BodyMetricsScreenState extends State<BodyMetricsScreen> {
     );
   }
 
-  Widget _buildInputField(String label, Function(String) onChanged) {
+  Widget _buildInputField(String label, TextEditingController controller, Function(String) onChanged) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: TextField(
+        controller: controller,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
         decoration: InputDecoration(
           labelText: label,
@@ -820,4 +927,92 @@ class _BodyMetricsScreenState extends State<BodyMetricsScreen> {
       ),
     );
   }
+
+  Widget _buildBmrInputField(TextEditingController controller, Function(String) onChanged) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: TextField(
+        controller: controller,
+        keyboardType: TextInputType.number,
+        decoration: InputDecoration(
+          labelText: '基础代谢 (kcal)',
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        onChanged: onChanged,
+      ),
+    );
+  }
 }
+
+class _MetricDotPainter extends FlDotPainter {
+  _MetricDotPainter({
+    required this.label,
+    required this.color,
+    this.radius = 4,
+    this.strokeWidth = 2,
+    this.strokeColor = Colors.white,
+    this.labelGap = 8,
+  });
+
+  final String label;
+  final Color color;
+  final double radius;
+  final double strokeWidth;
+  final Color strokeColor;
+  final double labelGap;
+
+  @override
+  void draw(Canvas canvas, FlSpot spot, Offset offsetInCanvas) {
+    if (strokeWidth != 0.0 && strokeColor.opacity != 0.0) {
+      canvas.drawCircle(
+        offsetInCanvas,
+        radius + (strokeWidth / 2),
+        Paint()
+          ..color = strokeColor
+          ..strokeWidth = strokeWidth
+          ..style = PaintingStyle.stroke,
+      );
+    }
+
+    canvas.drawCircle(
+      offsetInCanvas,
+      radius,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.fill,
+    );
+
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: color,
+        ),
+      ),
+      textAlign: TextAlign.center,
+      textDirection: ui.TextDirection.ltr,
+    )..layout();
+
+    final textOffset = Offset(
+      offsetInCanvas.dx - (textPainter.width / 2),
+      offsetInCanvas.dy - radius - labelGap - textPainter.height,
+    );
+
+    textPainter.paint(canvas, textOffset);
+  }
+
+  @override
+  Size getSize(FlSpot spot) => Size(radius * 2, radius * 2);
+
+  @override
+  Color get mainColor => color;
+
+  @override
+  FlDotPainter lerp(FlDotPainter a, FlDotPainter b, double t) => b;
+
+  @override
+  List<Object?> get props => [label, color, radius, strokeWidth, strokeColor, labelGap];
+}
+

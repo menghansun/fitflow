@@ -6,7 +6,9 @@ import 'other/other_activity_screen.dart';
 import '../theme/app_theme.dart';
 
 class WorkoutTypeSelectorSheet extends StatelessWidget {
-  const WorkoutTypeSelectorSheet({super.key});
+  final DateTime? initialDate;
+
+  const WorkoutTypeSelectorSheet({super.key, this.initialDate});
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +41,9 @@ class WorkoutTypeSelectorSheet extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '记录你的今日运动',
+            initialDate != null
+                ? '为 ${initialDate!.month}/${initialDate!.day} 记录运动'
+                : '记录你的今日运动',
             style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: 32),
@@ -59,7 +63,7 @@ class WorkoutTypeSelectorSheet extends StatelessWidget {
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => SwimRecordScreen()));
+                      MaterialPageRoute(builder: (_) => SwimRecordScreen(initialDate: initialDate)));
                 },
               ),
               _WorkoutTypeCard(
@@ -70,18 +74,18 @@ class WorkoutTypeSelectorSheet extends StatelessWidget {
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const GymSessionScreen()));
+                      MaterialPageRoute(builder: (_) => GymSessionScreen(initialDate: initialDate)));
                 },
               ),
               _WorkoutTypeCard(
                 title: '有氧运动',
-                subtitle: '记录距离、时长、心率',
+                subtitle: '记录距离、时长，心率',
                 icon: '🏃',
                 color: AppColors.cardioAccent,
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const CardioRecordScreen()));
+                      MaterialPageRoute(builder: (_) => CardioRecordScreen(initialDate: initialDate)));
                 },
               ),
               _WorkoutTypeCard(
@@ -92,7 +96,7 @@ class WorkoutTypeSelectorSheet extends StatelessWidget {
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const OtherActivityScreen()));
+                      MaterialPageRoute(builder: (_) => OtherActivityScreen(initialDate: initialDate)));
                 },
               ),
             ],

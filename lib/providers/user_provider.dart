@@ -41,11 +41,15 @@ class UserProvider extends ChangeNotifier {
         if (cloudProfile != null && cloudProfile.isNotEmpty) {
           final cloudNickname = cloudProfile['nickname'] as String?;
           final cloudAvatar = cloudProfile['avatar_emoji'] as String?;
+          final cloudHeight = (cloudProfile['height'] as num?)?.toDouble();
           if (cloudNickname?.isNotEmpty == true) {
             _currentUser!.nickname = cloudNickname!;
           }
           if (cloudAvatar != null) {
             _currentUser!.avatarEmoji = cloudAvatar;
+          }
+          if (cloudHeight != null) {
+            _currentUser!.height = cloudHeight;
           }
           await Hive.box<AppUser>(_usersBoxName).put(_currentUser!.id, _currentUser!);
         }
@@ -57,10 +61,10 @@ class UserProvider extends ChangeNotifier {
             id: lcUid,
             nickname: cloudProfile['nickname'] as String? ?? '我',
             avatarEmoji: cloudProfile['avatar_emoji'] as String?,
-            themeModeIndex: cloudProfile['theme_mode_index'] as int? ?? 0,
             createdAt: cloudProfile['created_at'] != null
                 ? DateTime.parse(cloudProfile['created_at'] as String)
                 : DateTime.now(),
+            height: (cloudProfile['height'] as num?)?.toDouble(),
           );
           await Hive.box<AppUser>(_usersBoxName).put(user.id, user);
           _allUsers.add(user);
@@ -78,7 +82,6 @@ class UserProvider extends ChangeNotifier {
           await SupabaseService.instance.saveProfile(
             nickname: user.nickname,
             avatarEmoji: user.avatarEmoji,
-            themeModeIndex: 0,
             createdAt: user.createdAt,
           );
           _allUsers.add(user);
@@ -136,10 +139,10 @@ class UserProvider extends ChangeNotifier {
             ? cloud!['nickname'] as String
             : (name.isEmpty ? '我' : name),
         avatarEmoji: cloud?['avatar_emoji'] as String? ?? '💪',
-        themeModeIndex: cloud?['theme_mode_index'] as int? ?? 0,
         createdAt: (cloud?['created_at'] as String?)?.isNotEmpty == true
             ? DateTime.parse(cloud!['created_at'] as String)
             : DateTime.now(),
+        height: (cloud?['height'] as num?)?.toDouble(),
       );
       await Hive.box<AppUser>(_usersBoxName).put(user.id, user);
       _allUsers.add(user);
@@ -162,12 +165,13 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
-  Future<AppUser> createUser(String nickname, String? avatarEmoji) async {
+  Future<AppUser> createUser(String nickname, String? avatarEmoji, {double? height}) async {
     final user = AppUser(
       id: const Uuid().v4(),
       nickname: nickname,
       avatarEmoji: avatarEmoji ?? '💪',
       createdAt: DateTime.now(),
+      height: height,
     );
     await Hive.box<AppUser>(_usersBoxName).put(user.id, user);
     await _ensureWorkoutBox(user.id);
@@ -182,8 +186,8 @@ class UserProvider extends ChangeNotifier {
     SupabaseService.instance.saveProfile(
       nickname: nickname,
       avatarEmoji: avatarEmoji ?? '💪',
-      themeModeIndex: 0,
       createdAt: user.createdAt,
+      height: height,
     );
     return user;
   }
@@ -205,8 +209,8 @@ class UserProvider extends ChangeNotifier {
     SupabaseService.instance.saveProfile(
       nickname: user.nickname,
       avatarEmoji: user.avatarEmoji,
-      themeModeIndex: user.themeModeIndex,
       createdAt: user.createdAt,
+      height: user.height,
     );
     notifyListeners();
   }
@@ -230,14 +234,4 @@ class UserProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  ThemeMode get currentThemeMode {
-    final idx = _currentUser?.themeModeIndex ?? 0;
-    return ThemeMode.values[idx];
-  }
-
-  Future<void> setThemeMode(ThemeMode mode) async {
-    if (_currentUser == null) return;
-    _currentUser!.themeModeIndex = mode.index;
-    await updateUser(_currentUser!);
-  }
 }

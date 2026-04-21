@@ -15,7 +15,8 @@ import '../../widgets/motivation_dialogs.dart';
 // ─────────────────────────────────────────────────────────
 class GymSessionScreen extends StatefulWidget {
   final WorkoutSession? editSession;
-  const GymSessionScreen({super.key, this.editSession});
+  final DateTime? initialDate;
+  const GymSessionScreen({super.key, this.editSession, this.initialDate});
 
   @override
   State<GymSessionScreen> createState() => _GymSessionScreenState();
@@ -23,7 +24,7 @@ class GymSessionScreen extends StatefulWidget {
 
 class _GymSessionScreenState extends State<GymSessionScreen> {
   // ── 时长 ───────────────────────────────────────────────
-  int _durHours = 0;
+  int _durHours = 1;
   int _durMinutes = 0;
 
   // ── 练习列表 ───────────────────────────────────────────
@@ -33,11 +34,14 @@ class _GymSessionScreenState extends State<GymSessionScreen> {
   final _caloriesController = TextEditingController();
   late DateTime _sessionDate;
 
+  // ── 防重复点击 ─────────────────────────────────────────
+  bool _isSaving = false;
+
   @override
   void initState() {
     super.initState();
     final s = widget.editSession;
-    _sessionDate = s?.date ?? DateTime.now();
+    _sessionDate = s?.date ?? widget.initialDate ?? DateTime.now();
     if (s != null) {
       final total = s.durationSeconds;
       _durHours = total ~/ 3600;
@@ -126,45 +130,51 @@ class _GymSessionScreenState extends State<GymSessionScreen> {
 
   // ── 结束训练 ───────────────────────────────────────────
   Future<void> _finish() async {
-    final totalSecs = _durHours * 3600 + _durMinutes * 60;
+    if (_isSaving) return;
+    _isSaving = true;
+    try {
+      final totalSecs = _durHours * 3600 + _durMinutes * 60;
 
-    final exercises = _exercises
-        .where((e) => e.sets.isNotEmpty)
-        .map((e) => GymExercise(
-              name: e.name,
-              muscleGroup: e.muscleGroup,
-              sets: e.sets
-                  .map((s) => GymSet(
-                        reps: s.reps,
-                        weight: s.weight,
-                        durationSeconds: s.durationSeconds,
-                        isBodyweight: s.isBodyweight,
-                      ))
-                  .toList(),
-            ))
-        .toList();
+      final exercises = _exercises
+          .where((e) => e.sets.isNotEmpty)
+          .map((e) => GymExercise(
+                name: e.name,
+                muscleGroup: e.muscleGroup,
+                sets: e.sets
+                    .map((s) => GymSet(
+                          reps: s.reps,
+                          weight: s.weight,
+                          durationSeconds: s.durationSeconds,
+                          isBodyweight: s.isBodyweight,
+                        ))
+                    .toList(),
+              ))
+          .toList();
 
-    final totalSets = exercises.fold(0, (s, e) => s + e.sets.length);
+      final totalSets = exercises.fold(0, (s, e) => s + e.sets.length);
 
-    final cals = int.tryParse(_caloriesController.text.trim());
+      final cals = int.tryParse(_caloriesController.text.trim());
 
-    final session = WorkoutSession(
-      id: widget.editSession?.id ?? context.read<WorkoutProvider>().generateId(),
-      date: _sessionDate,
-      type: WorkoutType.gym,
-      durationSeconds: totalSecs,
-      exercises: exercises.isNotEmpty ? exercises : null,
-      calories: cals,
-    );
+      final session = WorkoutSession(
+        id: widget.editSession?.id ?? context.read<WorkoutProvider>().generateId(),
+        date: _sessionDate,
+        type: WorkoutType.gym,
+        durationSeconds: totalSecs,
+        exercises: exercises.isNotEmpty ? exercises : null,
+        calories: cals,
+      );
 
-    await context.read<WorkoutProvider>().addSession(session);
-    if (!mounted) return;
+      await context.read<WorkoutProvider>().addSession(session);
+      if (!mounted) return;
 
-    if (widget.editSession != null) {
-      Navigator.pop(context, true);
-      return;
+      if (widget.editSession != null) {
+        Navigator.pop(context, true);
+        return;
+      }
+      await _showSummary(session, totalSets);
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
-    await _showSummary(session, totalSets);
   }
 
   Future<void> _showSummary(WorkoutSession s, int totalSets) async {
@@ -222,11 +232,11 @@ class _GymSessionScreenState extends State<GymSessionScreen> {
             ),
             actions: [
               TextButton(
-                onPressed: _finish,
+                onPressed: _isSaving ? null : _finish,
                 child: Text(
-                  isEdit ? '保存修改' : '保存',
+                  _isSaving ? '保存中...' : (isEdit ? '保存修改' : '保存'),
                   style: TextStyle(
-                      color: accent,
+                      color: _isSaving ? Colors.grey : accent,
                       fontWeight: FontWeight.bold,
                       fontSize: 16),
                 ),
@@ -708,7 +718,7 @@ class _ExerciseCard extends StatelessWidget {
                     final last =
                         entry.sets.isNotEmpty ? entry.sets.last : null;
                     entry.sets.add(_SetData(
-                      reps: last?.reps ?? 10,
+                      reps: last?.reps ?? 12,
                       weight: last?.weight ?? 0,
                       isBodyweight: last?.isBodyweight ?? false,
                     ));

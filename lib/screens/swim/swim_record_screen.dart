@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+﻿import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/workout_session.dart';
@@ -7,40 +7,62 @@ import '../../theme/app_theme.dart';
 import '../../services/ocr_service.dart';
 import '../../widgets/motivation_dialogs.dart';
 
-// ─────────────────────────────────────────────────────────
-//  游泳记录页（纯填写模式）
-// ─────────────────────────────────────────────────────────
+String _styleLabel(SwimStyle style) {
+  switch (style) {
+    case SwimStyle.freestyle:
+      return '鑷敱娉?;
+    case SwimStyle.breaststroke:
+      return '铔欐吵';
+    case SwimStyle.backstroke:
+      return '浠版吵';
+    case SwimStyle.butterfly:
+      return '铦舵吵';
+    case SwimStyle.medley:
+      return '娣峰悎娉?;
+  }
+}
+
+String _styleEmoji(SwimStyle style) {
+  switch (style) {
+    case SwimStyle.freestyle:
+      return '馃強';
+    case SwimStyle.breaststroke:
+      return '馃惛';
+    case SwimStyle.backstroke:
+      return '馃攧';
+    case SwimStyle.butterfly:
+      return '馃';
+    case SwimStyle.medley:
+      return '馃弲';
+  }
+}
+
 class SwimRecordScreen extends StatefulWidget {
   final WorkoutSession? editSession;
-  const SwimRecordScreen({super.key, this.editSession});
+  final DateTime? initialDate;
+  const SwimRecordScreen({super.key, this.editSession, this.initialDate});
 
   @override
   State<SwimRecordScreen> createState() => _SwimRecordScreenState();
 }
 
 class _SwimRecordScreenState extends State<SwimRecordScreen> {
-  // ── 字段状态 ────────────────────────────────────────────
   late DateTime _date;
 
-  // OCR 服务
-  final _ocrService = HuaweiHealthOcrService();
+  // OCR 閺堝秴濮?  final _ocrService = HuaweiHealthOcrService();
   bool _ocrLoading = false;
 
-  // 时长：时 / 分 / 秒
   int _durHours = 0;
   int _durMinutes = 30;
   int _durSecs = 0;
 
-  // 距离
   static const List<int> _distanceOptions = [
     25, 50, 75,
     100, 150, 200, 250, 300, 350, 400, 450, 500,
     550, 600, 650, 700, 750, 800, 850, 900, 950,
     1000, 1100, 1200, 1500, 2000, 2500, 3000,
   ];
-  int _distance = 500; // 实际距离值（米），OCR 直接赋值不吸附预设
-
-  /// 拨轮初始位置：找 _distanceOptions 里最接近 _distance 的下标
+  int _distance = 500; // 瀹為檯璺濈鍊硷紙绫筹級锛孫CR 鐩存帴璧嬪€兼椂涓嶅惛闄勯璁?
   int get _closestDistanceIndex {
     int best = 0;
     int bestDiff = (_distanceOptions[0] - _distance).abs();
@@ -56,30 +78,27 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
   int? _maxHeartRate;
   bool _heartRateEnabled = false;
 
-  // 卡路里：可选，null = 未填
   int? _calories;
   bool _caloriesEnabled = false;
 
-  // 泳姿明细
   List<SwimSet> _swimSets = [];
   bool _swimSetsExpanded = false;
 
-  // 游泳高级指标（来自 OCR）
   int? _poolLengthMeters;
   int? _laps;
   String? _avgPace;
   int? _swolfAvg;
   int? _strokeCount;
-
   // 额外数据控制器（持久化，避免 build 中重建导致光标跳位）
   final TextEditingController _lapsCtrl        = TextEditingController();
   final TextEditingController _poolCtrl        = TextEditingController();
   final TextEditingController _paceCtrl        = TextEditingController();
   final TextEditingController _swolfCtrl       = TextEditingController();
   final TextEditingController _strokeCtrl      = TextEditingController();
-
+  final TextEditingController _strokeCtrl      = TextEditingController();
   // 备注
   final TextEditingController _notesController = TextEditingController();
+  // 婢跺洦鏁?  final TextEditingController _notesController = TextEditingController();
 
   @override
   void initState() {
@@ -88,27 +107,23 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
     if (s != null) {
       _date = s.date;
       _distance = s.totalDistanceMeters ?? _distance;
-      // 时长：小时拨轮 0–23、分秒 0–59；超长记录裁剪到 23:59:59 以免 initialItem 越界崩溃
       const maxPickerSec = 23 * 3600 + 59 * 60 + 59;
       final sec = s.durationSeconds > maxPickerSec ? maxPickerSec : s.durationSeconds;
       _durHours = sec ~/ 3600;
       final rem = sec % 3600;
       _durMinutes = rem ~/ 60;
       _durSecs = rem % 60;
-      // 心率
-      if (s.heartRateAvg != null || s.heartRateMax != null) {
+      // 韫囧啰宸?      if (s.heartRateAvg != null || s.heartRateMax != null) {
         _heartRateEnabled = true;
         _avgHeartRate = s.heartRateAvg;
         _maxHeartRate = s.heartRateMax;
       }
-      // 卡路里
       if (s.calories != null) {
         _caloriesEnabled = true;
         _calories = s.calories;
       }
-      // 游泳明细
       if (s.swimSets != null) _swimSets = List.of(s.swimSets!);
-      // 高级指标
+      // 妤傛楠囬幐鍥ㄧ垼
       _poolLengthMeters = s.poolLengthMeters;
       _laps        = s.laps;
       _avgPace     = s.avgPace;
@@ -119,10 +134,9 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
       _paceCtrl.text   = s.avgPace ?? '';
       _swolfCtrl.text  = s.swolfAvg?.toString() ?? '';
       _strokeCtrl.text = s.strokeCount?.toString() ?? '';
-      // 备注
-      _notesController.text = s.notes ?? '';
+      // 婢跺洦鏁?      _notesController.text = s.notes ?? '';
     } else {
-      _date = DateTime.now();
+      _date = widget.initialDate ?? DateTime.now();
     }
   }
 
@@ -137,7 +151,6 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
     super.dispose();
   }
 
-  // ── OCR 导入（批量，每张图生成一条记录）────────────────
   Future<void> _runOcrImport() async {
     setState(() => _ocrLoading = true);
     List<OcrPickResult> pickedList = [];
@@ -146,7 +159,7 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('识别失败：$e')));
+            .showSnackBar(SnackBar(content: Text('璇嗗埆澶辫触锛?e')));
       }
       if (mounted) setState(() => _ocrLoading = false);
       return;
@@ -156,12 +169,11 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
 
     if (!mounted || pickedList.isEmpty) return;
 
-    // 单张：走原有填表流程
     if (pickedList.length == 1) {
       final result = pickedList.first.swimResult;
       if (result.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('未能识别到游泳数据，请重试或手动填写')),
+          const SnackBar(content: Text('鏈兘璇嗗埆鍒版父娉虫暟鎹紝璇烽噸璇曟垨鎵嬪姩濉啓')),
         );
         return;
       }
@@ -177,7 +189,6 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
       return;
     }
 
-    // 多张：逐条弹确认 Sheet，每次直接保存为独立记录
     int saved = 0;
     for (int i = 0; i < pickedList.length; i++) {
       if (!mounted) break;
@@ -205,22 +216,19 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
     if (!mounted) return;
     if (saved > 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已保存 $saved 条游泳记录')),
+        SnackBar(content: Text('宸蹭繚瀛?$saved 鏉℃父娉宠褰?)),
       );
       Navigator.pop(context);
     }
   }
 
-  /// 将 OCR 结果直接保存为一条 WorkoutSession（批量模式用）
   Future<void> _saveOcrAsSession(
       SwimOcrResult result, Set<String> accepted) async {
-    // 距离
     int distanceM = 0;
     if (accepted.contains('distance') && result.distanceMeters != null) {
       distanceM = result.distanceMeters!;
     }
 
-    // 时长
     int totalSeconds = 0;
     if (accepted.contains('duration')) {
       if (result.durationRaw != null) {
@@ -236,7 +244,6 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
       }
     }
 
-    // 泳姿
     List<SwimSet>? swimSets;
     if (accepted.contains('swimStyle') && result.swimStyle != null) {
       final style = _styleFromString(result.swimStyle!);
@@ -266,10 +273,8 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
     await context.read<WorkoutProvider>().addSession(session);
   }
 
-  /// 将确认后的 OCR 数据填入表单
   void _applyOcrResult(SwimOcrResult result, Set<String> accepted) {
     setState(() {
-      // ── 先清空上次 OCR 填入的数据 ─────────────────────────
       _swimSets.clear();
       _swimSetsExpanded = false;
       _heartRateEnabled = false;
@@ -283,15 +288,12 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
       _swolfAvg = null;
       _strokeCount = null;
 
-      // 运动日期时间（截图里解析到的）
       if (result.workoutDateTime != null) {
         _date = result.workoutDateTime!;
       }
-      // 距离 — 直接使用 OCR 原始值，不吸附预设
       if (accepted.contains('distance') && result.distanceMeters != null) {
         _distance = result.distanceMeters!;
       }
-      // 时长 — 精确到秒
       if (accepted.contains('duration') && result.durationRaw != null) {
         final reg = RegExp(r'(\d{1,2}):(\d{2}):(\d{2})');
         final m = reg.firstMatch(result.durationRaw!);
@@ -305,22 +307,18 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
         _durMinutes = result.durationMinutes! % 60;
         _durSecs = 0;
       }
-      // 卡路里
       if (accepted.contains('calories') && result.calories != null) {
         _caloriesEnabled = true;
         _calories = result.calories!.clamp(100, 1500);
       }
-      // 平均心率
       if (accepted.contains('avgHR') && result.avgHeartRate != null) {
         _heartRateEnabled = true;
         _avgHeartRate = result.avgHeartRate!.clamp(60, 200);
       }
-      // 最大心率
       if (accepted.contains('maxHR') && result.maxHeartRate != null) {
         _heartRateEnabled = true;
         _maxHeartRate = result.maxHeartRate!.clamp(60, 220);
       }
-      // 泳姿 — 自动添加一条泳姿明细
       if (accepted.contains('swimStyle') && result.swimStyle != null) {
         final style = _styleFromString(result.swimStyle!);
         if (style != null) {
@@ -331,17 +329,15 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
           _swimSetsExpanded = true;
         }
       }
-      // 泳池长度
       if (accepted.contains('poolLength') && result.poolLength != null) {
         _poolLengthMeters = result.poolLength;
         _poolCtrl.text = _poolLengthMeters.toString();
       }
-      // 趟数
       if (accepted.contains('laps') && result.laps != null) {
         _laps = result.laps;
         _lapsCtrl.text = _laps.toString();
       }
-      // 配速
+      // 闁板秹鈧?
       if (accepted.contains('avgPace') && result.avgPace != null) {
         _avgPace = result.avgPace;
         _paceCtrl.text = _avgPace!;
@@ -351,7 +347,6 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
         _swolfAvg = result.swolfAvg;
         _swolfCtrl.text = _swolfAvg.toString();
       }
-      // 划水次数
       if (accepted.contains('strokeCount') && result.strokeCount != null) {
         _strokeCount = result.strokeCount;
         _strokeCtrl.text = _strokeCount.toString();
@@ -361,16 +356,15 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
 
   SwimStyle? _styleFromString(String s) {
     switch (s) {
-      case '蛙泳': return SwimStyle.breaststroke;
-      case '自由泳': return SwimStyle.freestyle;
-      case '仰泳': return SwimStyle.backstroke;
-      case '蝶泳': return SwimStyle.butterfly;
-      case '混合泳': return SwimStyle.medley;
+      case '铔欐吵': return SwimStyle.breaststroke;
+      case '鑷敱娉?: return SwimStyle.freestyle;
+      case '浠版吵': return SwimStyle.backstroke;
+      case '铦舵吵': return SwimStyle.butterfly;
+      case '娣峰悎娉?: return SwimStyle.medley;
       default: return null;
     }
   }
 
-  // ── 日期+时间选择 ────────────────────────────────────────
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -387,7 +381,6 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
       ),
     );
     if (picked == null) return;
-    // 保留原来的时间部分
     setState(() => _date = DateTime(
         picked.year, picked.month, picked.day,
         _date.hour, _date.minute));
@@ -412,7 +405,6 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
         picked.hour, picked.minute));
   }
 
-  // ── 保存记录 ────────────────────────────────────────────
   Future<void> _save() async {
     final totalSeconds = _durHours * 3600 + _durMinutes * 60 + _durSecs;
     final durationMins = totalSeconds ~/ 60;
@@ -443,7 +435,6 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
     if (!mounted) return;
 
     if (widget.editSession != null) {
-      // 编辑模式：直接返回，通知上层刷新
       Navigator.pop(context, true);
       return;
     }
@@ -453,28 +444,27 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
   Future<void> _showSummary(WorkoutSession session) async {
     final durMins = session.durationInMinutes;
     final distDisplay = session.totalDistanceMeters != null
-        ? ' · ${session.totalDistanceMeters} 米'
+        ? ' 璺?${session.totalDistanceMeters} 缁?
         : '';
     final setsDisplay = session.swimSets != null
-        ? ' · ${session.swimSets!.length} 组'
+        ? ' 路 ${session.swimSets!.length} 缁?
         : '';
     await showSuccessDialog(
       context: context,
       typeKey: 'swim',
-      typeEmoji: '🏊',
-      typeLabel: '游泳',
-      detailText: '$durMins 分钟$distDisplay$setsDisplay',
+      typeEmoji: '馃強',
+      typeLabel: '娓告吵',
+      detailText: '$durMins 鍒嗛挓$distDisplay$setsDisplay',
       isEdit: false,
     );
     if (!mounted) return;
-    // 里程碑检查
+    // 闁插瞼鈻肩喊鎴烆梾閺?
     final streak = context.read<WorkoutProvider>().currentStreak;
     await checkAndShowMilestone(context, streak);
     if (!mounted) return;
     Navigator.pop(context); // screen
   }
 
-  // ── 添加泳姿 BottomSheet ─────────────────────────────────
   void _openAddSwimSetSheet() {
     showModalBottomSheet(
       context: context,
@@ -486,7 +476,14 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
     );
   }
 
-  // ── UI ─────────────────────────────────────────────────
+  String _swimStyleLabel(SwimStyle style) {
+    return _styleLabel(style);
+  }
+
+  String _swimStyleEmoji(SwimStyle style) {
+    return _styleEmoji(style);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -496,54 +493,43 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
       backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
       body: Column(
         children: [
-          // ── 渐变头部 ──────────────────────────────────────
           _GradientHeader(
             onBack: () => Navigator.pop(context),
-            title: widget.editSession != null ? '修改游泳记录 🏊' : '记录游泳 🏊',
-            subtitle: widget.editSession != null ? '修改后点击保存' : '填写本次游泳数据',
+            title: widget.editSession != null ? '淇敼娓告吵璁板綍 馃強' : '璁板綍娓告吵 馃強',
+            subtitle: widget.editSession != null ? '淇敼鍚庣偣鍑讳繚瀛? : '濉啓鏈娓告吵鏁版嵁',
           ),
 
-          // ── 滚动内容 ──────────────────────────────────────
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 0. 华为健康截图导入按钮
                   _buildOcrImportCard(),
                   const SizedBox(height: 12),
 
-                  // 1. 日期
                   _buildDateCard(),
                   const SizedBox(height: 12),
 
-                  // 2. 时长
                   _buildDurationCard(),
                   const SizedBox(height: 12),
 
-                  // 3. 距离
                   _buildDistanceCard(),
                   const SizedBox(height: 12),
 
-                  // 4. 心率（可选）
-                  _buildHeartRateCard(),
+                  // 4. 韫囧啰宸奸敍鍫濆讲闁绱?                  _buildHeartRateCard(),
                   const SizedBox(height: 12),
 
-                  // 5. 卡路里（可选）
                   _buildCaloriesCard(),
                   const SizedBox(height: 12),
 
-                  // 6. 泳姿明细（可选，可折叠）
                   _buildSwimSetsCard(),
                   const SizedBox(height: 12),
 
-                  // 7. 额外数据（趟数、泳池、配速、SWOLF、划水次数）
-                  _buildExtraMetricsCard(),
+                  // 7. 妫版繂顦婚弫鐗堝祦閿涘牐绋涢弫鑸偓浣瑰惖濮圭姰鈧線鍘ら柅鐔粹偓涓糤OLF閵嗕礁鍨濆瀛橆偧閺佸府绱?                  _buildExtraMetricsCard(),
                   const SizedBox(height: 12),
 
-                  // 8. 备注
-                  _buildNotesCard(),
+                  // 8. 婢跺洦鏁?                  _buildNotesCard(),
                 ],
               ),
             ),
@@ -551,12 +537,10 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
         ],
       ),
 
-      // ── 底部保存按钮 ────────────────────────────────────
       bottomNavigationBar: _SaveButton(onSave: _save),
     );
   }
 
-  // ── OCR 导入卡片 ───────────────────────────────────────
   Widget _buildOcrImportCard() {
     return GestureDetector(
       onTap: _ocrLoading ? null : _runOcrImport,
@@ -572,7 +556,6 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
           border: Border.all(
             color: const Color(0xFF1976D2).withValues(alpha:0.55),
             width: 1.8,
-            // 虚线由 CustomPaint 模拟，此处用实线淡色达到品牌感
           ),
         ),
         child: _ocrLoading
@@ -590,7 +573,7 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
                   ),
                   SizedBox(width: 10),
                   Text(
-                    '识别中... 🔍',
+                    '璇嗗埆涓?.. 馃摮',
                     style: TextStyle(
                       color: Color(0xFF1976D2),
                       fontWeight: FontWeight.w600,
@@ -620,7 +603,7 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: const [
                         Text(
-                          '📷 从华为健康 / 小米运动截图导入',
+                          '馃摬 浠庡崕涓哄仴搴?/ 灏忕背杩愬姩鎴浘瀵煎叆',
                           style: TextStyle(
                             color: Color(0xFF1976D2),
                             fontWeight: FontWeight.bold,
@@ -629,7 +612,7 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
                         ),
                         SizedBox(height: 3),
                         Text(
-                          '自动识别运动数据，一键填入',
+                          '鑷姩璇嗗埆杩愬姩鏁版嵁锛屼竴閿～鍏?,
                           style: TextStyle(
                             color: Color(0xFF1976D2),
                             fontSize: 12.5,
@@ -650,18 +633,17 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
     );
   }
 
-  // ── 日期时间卡片 ─────────────────────────────────────────
   Widget _buildDateCard() {
     final theme = Theme.of(context);
-    final months = ['', '1月', '2月', '3月', '4月', '5月', '6月',
-        '7月', '8月', '9月', '10月', '11月', '12月'];
-    final weekdays = ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+    final months = ['', '1鏈?, '2鏈?, '3鏈?, '4鏈?, '5鏈?, '6鏈?,
+        '7鏈?, '8鏈?, '9鏈?, '10鏈?, '11鏈?, '12鏈?];
+    final weekdays = ['', '鍛ㄤ竴', '鍛ㄤ簩', '鍛ㄤ笁', '鍛ㄥ洓', '鍛ㄤ簲', '鍛ㄥ叚', '鍛ㄦ棩'];
     final isToday = _date.year == DateTime.now().year &&
         _date.month == DateTime.now().month &&
         _date.day == DateTime.now().day;
     final dateStr = isToday
-        ? '今天'
-        : '${months[_date.month]}${_date.day}日';
+        ? '浠婂ぉ'
+        : '${months[_date.month]}${_date.day}鏃?;
     final weekStr = isToday ? '' : '  ${weekdays[_date.weekday]}';
     final timeStr =
         '${_date.hour.toString().padLeft(2, '0')}:${_date.minute.toString().padLeft(2, '0')}';
@@ -669,7 +651,6 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
     return _SectionCard(
       child: Row(
         children: [
-          // ── 日期区域 ──────────────────────────────
           Expanded(
             child: GestureDetector(
               onTap: _pickDate,
@@ -689,7 +670,7 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
                       const Icon(Icons.calendar_today_outlined,
                           color: AppColors.swimAccent, size: 13),
                       const SizedBox(width: 4),
-                      Text('日期',
+                      Text('鏃ユ湡',
                           style: TextStyle(
                               color: AppColors.swimAccent,
                               fontSize: 11,
@@ -706,7 +687,6 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
             ),
           ),
           const SizedBox(width: 10),
-          // ── 时间区域 ──────────────────────────────
           Expanded(
             child: GestureDetector(
               onTap: _pickTime,
@@ -726,7 +706,7 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
                       const Icon(Icons.access_time_outlined,
                           color: AppColors.swimAccent, size: 13),
                       const SizedBox(width: 4),
-                      Text('时间',
+                      Text('鏃堕棿',
                           style: TextStyle(
                               color: AppColors.swimAccent,
                               fontSize: 11,
@@ -747,13 +727,14 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
     );
   }
 
-  // ── 时长卡片 ────────────────────────────────────────────
   Widget _buildDurationCard() {
     final theme = Theme.of(context);
 
     String fmt(int h, int m, int s) {
-      if (h > 0) return '$h时${m.toString().padLeft(2,'0')}分${s.toString().padLeft(2,'0')}秒';
-      return '${m.toString().padLeft(2,'0')}分${s.toString().padLeft(2,'0')}秒';
+      if (h > 0) {
+        return '$h鏃?{m.toString().padLeft(2, '0')}鍒?{s.toString().padLeft(2, '0')}绉?;
+      }
+      return '${m.toString().padLeft(2, '0')}鍒?{s.toString().padLeft(2, '0')}绉?;
     }
 
     return _SectionCard(
@@ -776,7 +757,7 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('时长', style: theme.textTheme.bodyMedium),
+                  Text('鏃堕暱', style: theme.textTheme.bodyMedium),
                   Text(
                     fmt(_durHours, _durMinutes, _durSecs),
                     style: theme.textTheme.titleMedium?.copyWith(
@@ -792,7 +773,6 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
             height: 120,
             child: Row(
               children: [
-                // 时
                 Expanded(
                   child: Stack(
                     alignment: Alignment.center,
@@ -806,7 +786,7 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
                         children: List.generate(
                           24,
                           (i) => Center(
-                            child: Text('$i 时',
+                            child: Text('$i 鏃?,
                                 style: TextStyle(
                                     color: theme.textTheme.bodyLarge?.color,
                                     fontSize: 16)),
@@ -816,7 +796,6 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
                     ],
                   ),
                 ),
-                // 分
                 Expanded(
                   child: CupertinoPicker(
                     scrollController: FixedExtentScrollController(
@@ -827,7 +806,7 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
                     children: List.generate(
                       60,
                       (i) => Center(
-                        child: Text('$i 分',
+                        child: Text('$i 鍒?,
                             style: TextStyle(
                                 color: theme.textTheme.bodyLarge?.color,
                                 fontSize: 16)),
@@ -835,7 +814,7 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
                     ),
                   ),
                 ),
-                // 秒
+                // 缁?
                 Expanded(
                   child: CupertinoPicker(
                     scrollController: FixedExtentScrollController(
@@ -846,7 +825,7 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
                     children: List.generate(
                       60,
                       (i) => Center(
-                        child: Text('$i 秒',
+                        child: Text('$i 绉?,
                             style: TextStyle(
                                 color: theme.textTheme.bodyLarge?.color,
                                 fontSize: 16)),
@@ -862,7 +841,6 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
     );
   }
 
-  // ── 距离卡片 ────────────────────────────────────────────
   Widget _buildDistanceCard() {
     final theme = Theme.of(context);
     return _SectionCard(
@@ -885,9 +863,9 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('距离', style: theme.textTheme.bodyMedium),
+                  Text('璺濈', style: theme.textTheme.bodyMedium),
                   Text(
-                    '$_distance 米',
+                      '$_distance 绫?,
                     style: theme.textTheme.titleMedium?.copyWith(
                       color: AppColors.swimAccent,
                     ),
@@ -908,7 +886,7 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
               children: _distanceOptions
                   .map((d) => Center(
                         child: Text(
-                          '$d 米',
+                          '$d 绫?,
                           style: TextStyle(
                             color: theme.textTheme.bodyLarge?.color,
                             fontSize: 16,
@@ -923,7 +901,6 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
     );
   }
 
-  // ── 心率卡片 ────────────────────────────────────────────
   Widget _buildHeartRateCard() {
     final theme = Theme.of(context);
 
@@ -945,15 +922,15 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
               ),
               const SizedBox(width: 14),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
                     Text('平均心率', style: theme.textTheme.bodyMedium),
                     Text(
-                      _heartRateEnabled
-                          ? '$_avgHeartRate bpm'
-                          : '未记录',
+                      _heartRateEnabled ? ' bpm' : '未记录',
                       style: theme.textTheme.titleMedium?.copyWith(
+                        color: _heartRateEnabled
+                            ? Colors.pinkAccent
+                            : theme.textTheme.bodyMedium?.color,
+                      ),
+                    ),
                         color: _heartRateEnabled
                             ? Colors.pinkAccent
                             : theme.textTheme.bodyMedium?.color,
@@ -997,7 +974,6 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
     );
   }
 
-  // ── 卡路里卡片 ─────────────────────────────────────────
   Widget _buildCaloriesCard() {
     final theme = Theme.of(context);
 
@@ -1022,9 +998,9 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('卡路里', style: theme.textTheme.bodyMedium),
+                    Text('鍗¤矾閲?, style: theme.textTheme.bodyMedium),
                     Text(
-                      _caloriesEnabled ? '$_calories kcal' : '未记录',
+                      _caloriesEnabled ? '$_calories kcal' : '鏈褰?,
                       style: theme.textTheme.titleMedium?.copyWith(
                         color: _caloriesEnabled
                             ? AppColors.gymAccent
@@ -1069,7 +1045,6 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
     );
   }
 
-  // ── 泳姿明细卡片 ───────────────────────────────────────
   Widget _buildSwimSetsCard() {
     final theme = Theme.of(context);
 
@@ -1097,11 +1072,11 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('泳姿明细', style: theme.textTheme.bodyMedium),
+                      Text('娉冲Э鏄庣粏', style: theme.textTheme.bodyMedium),
                       Text(
                         _swimSets.isEmpty
-                            ? '可选，未添加'
-                            : '已添加 ${_swimSets.length} 组',
+                            ? '鍙€夛紝鏈坊鍔?
+                            : '宸叉坊鍔?${_swimSets.length} 缁?,
                         style: theme.textTheme.titleMedium?.copyWith(
                           color: _swimSets.isNotEmpty
                               ? AppColors.swimAccent
@@ -1122,7 +1097,6 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
           ),
           if (_swimSetsExpanded) ...[
             const SizedBox(height: 12),
-            // 已有泳姿列表
             ..._swimSets.asMap().entries.map((e) => Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: _SwimSetChip(
@@ -1132,7 +1106,6 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
                   ),
                 )),
             const SizedBox(height: 4),
-            // 添加按钮
             GestureDetector(
               onTap: _openAddSwimSetSheet,
               child: Container(
@@ -1152,7 +1125,7 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
                         color: AppColors.swimAccent, size: 18),
                     const SizedBox(width: 6),
                     Text(
-                      '+ 添加一组',
+                      '+ 娣诲姞涓€缁?,
                       style: TextStyle(
                         color: AppColors.swimAccent,
                         fontWeight: FontWeight.w600,
@@ -1169,7 +1142,6 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
     );
   }
 
-  // ── 额外数据卡片 ────────────────────────────────────────
   Widget _buildExtraMetricsCard() {
     final theme = Theme.of(context);
 
@@ -1222,42 +1194,42 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
                     color: AppColors.swimAccent, size: 22),
               ),
               const SizedBox(width: 14),
-              Text('额外数据', style: theme.textTheme.titleMedium),
+               Text('棰濆鏁版嵁', style: theme.textTheme.titleMedium),
             ],
           ),
           const SizedBox(height: 16),
           metricTile(
-            label: '趟数',
+            label: '瓒熸暟',
             controller: _lapsCtrl,
-            hint: '如 36',
+            hint: '濡?36',
             keyboardType: TextInputType.number,
             onChanged: (v) { _laps = int.tryParse(v); },
           ),
           metricTile(
-            label: '泳池长度',
+            label: '娉虫睜闀垮害',
             controller: _poolCtrl,
             hint: '25 / 50',
             keyboardType: TextInputType.number,
             onChanged: (v) { _poolLengthMeters = int.tryParse(v); },
           ),
           metricTile(
-            label: '平均配速',
+            label: '骞冲潎閰嶉€?,
             controller: _paceCtrl,
-            hint: "如 6'43\"",
+            hint: '濡?6\'43"',
             keyboardType: TextInputType.text,
             onChanged: (v) { _avgPace = v.isEmpty ? null : v; },
           ),
           metricTile(
             label: 'SWOLF',
             controller: _swolfCtrl,
-            hint: '如 102',
+            hint: '濡?102',
             keyboardType: TextInputType.number,
             onChanged: (v) { _swolfAvg = int.tryParse(v); },
           ),
           metricTile(
-            label: '划水次数',
+            label: '鍒掓按娆℃暟',
             controller: _strokeCtrl,
-            hint: '如 427',
+            hint: '濡?427',
             keyboardType: TextInputType.number,
             onChanged: (v) { _strokeCount = int.tryParse(v); },
           ),
@@ -1266,7 +1238,6 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
     );
   }
 
-  // ── 备注卡片 ────────────────────────────────────────────
   Widget _buildNotesCard() {
     final theme = Theme.of(context);
 
@@ -1291,7 +1262,7 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
               maxLines: 1,
               maxLength: 80,
               decoration: InputDecoration(
-                hintText: '备注（可选）',
+                hintText: '婢跺洦鏁為敍鍫濆讲闁绱?,
                 border: InputBorder.none,
                 counterText: '',
                 filled: false,
@@ -1309,9 +1280,6 @@ class _SwimRecordScreenState extends State<SwimRecordScreen> {
   }
 }
 
-// ─────────────────────────────────────────────────────────
-//  渐变头部
-// ─────────────────────────────────────────────────────────
 class _GradientHeader extends StatelessWidget {
   final VoidCallback onBack;
   final String title;
@@ -1319,8 +1287,8 @@ class _GradientHeader extends StatelessWidget {
 
   const _GradientHeader({
     required this.onBack,
-    this.title = '记录游泳 🏊',
-    this.subtitle = '填写本次游泳数据',
+    this.title = '璁板綍娓告吵 馃強',
+    this.subtitle = '濉啓鏈娓告吵鏁版嵁',
   });
 
   @override
@@ -1381,9 +1349,6 @@ class _GradientHeader extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────
-//  通用卡片容器
-// ─────────────────────────────────────────────────────────
 class _SectionCard extends StatelessWidget {
   final Widget child;
 
@@ -1413,9 +1378,6 @@ class _SectionCard extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────
-//  泳姿明细 Chip
-// ─────────────────────────────────────────────────────────
 class _SwimSetChip extends StatelessWidget {
   final int index;
   final SwimSet set;
@@ -1459,7 +1421,7 @@ class _SwimSetChip extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Text(
-            '${set.style.emoji} ${set.style.displayName}',
+            '${_styleEmoji(set.style)} ${_styleLabel(set.style)}',
             style: theme.textTheme.bodyLarge,
           ),
           const Spacer(),
@@ -1479,9 +1441,6 @@ class _SwimSetChip extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────
-//  保存按钮
-// ─────────────────────────────────────────────────────────
 class _SaveButton extends StatelessWidget {
   final VoidCallback onSave;
 
@@ -1522,7 +1481,7 @@ class _SaveButton extends StatelessWidget {
               Icon(Icons.save_outlined, size: 20),
               SizedBox(width: 8),
               Text(
-                '保存记录',
+                '淇濆瓨璁板綍',
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
               ),
             ],
@@ -1533,9 +1492,6 @@ class _SaveButton extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────
-//  添加泳姿 BottomSheet
-// ─────────────────────────────────────────────────────────
 class _AddSwimSetSheet extends StatefulWidget {
   final ValueChanged<SwimSet> onAdd;
 
@@ -1544,11 +1500,11 @@ class _AddSwimSetSheet extends StatefulWidget {
   @override
   State<_AddSwimSetSheet> createState() => _AddSwimSetSheetState();
 }
-
-class _AddSwimSetSheetState extends State<_AddSwimSetSheet> {
-  SwimStyle _style = SwimStyle.freestyle;
   int _customDist = 200; // 当前距离值
   final TextEditingController _distController = TextEditingController(text: '200');
+class _AddSwimSetSheetState extends State<_AddSwimSetSheet> {
+  SwimStyle _style = SwimStyle.freestyle;
+  int _customDist = 200; // 褰撳墠璺濈鍊?  final TextEditingController _distController = TextEditingController(text: '200');
 
   static const List<int> _quickOptions = [25, 50, 100, 200, 400, 500, 800, 1000];
 
@@ -1584,7 +1540,7 @@ class _AddSwimSetSheetState extends State<_AddSwimSetSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 拖动条
+          // 閹锋牕濮╅弶?
           Center(
             child: Container(
               width: 36,
@@ -1596,17 +1552,16 @@ class _AddSwimSetSheetState extends State<_AddSwimSetSheet> {
             ),
           ),
           const SizedBox(height: 20),
-          Text('添加泳姿明细', style: theme.textTheme.headlineMedium),
+          Text('娣诲姞娉冲Э鏄庣粏', style: theme.textTheme.headlineMedium),
           const SizedBox(height: 20),
 
-          // 泳姿选择
-          Text('泳姿', style: theme.textTheme.titleMedium),
+          Text('娉冲Э', style: theme.textTheme.titleMedium),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: SwimStyle.values.map((s) => _StyleChip(
-              label: '${s.emoji} ${s.displayName}',
+              label: '${_styleEmoji(s)} ${_styleLabel(s)}',
               selected: _style == s,
               onTap: () => setState(() => _style = s),
             )).toList(),
@@ -1614,10 +1569,9 @@ class _AddSwimSetSheetState extends State<_AddSwimSetSheet> {
 
           const SizedBox(height: 20),
 
-          // 距离选择
-          Text('距离', style: theme.textTheme.titleMedium),
+          Text('璺濈', style: theme.textTheme.titleMedium),
           const SizedBox(height: 12),
-          // 快捷选项（Wrap 自动换行）
+          // 韫囶偅宓庨柅澶愩€嶉敍鍦祌ap 閼奉亜濮╅幑銏ｎ攽閿?
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -1628,10 +1582,10 @@ class _AddSwimSetSheetState extends State<_AddSwimSetSheet> {
             )).toList(),
           ),
           const SizedBox(height: 14),
-          // 自定义输入
+          // 閼奉亜鐣炬稊澶庣翻閸?
           Row(
             children: [
-              const Text('自定义：', style: TextStyle(fontSize: 14, color: Colors.grey)),
+              const Text('鑷畾涔夛細', style: TextStyle(fontSize: 14, color: Colors.grey)),
               const SizedBox(width: 8),
               SizedBox(
                 width: 90,
@@ -1681,7 +1635,7 @@ class _AddSwimSetSheetState extends State<_AddSwimSetSheet> {
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
-              child: const Text('添加',
+              child: const Text('娣诲姞',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ),
           ),
@@ -1738,12 +1692,7 @@ class _StyleChip extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────
-//  完成弹窗
-// ─────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────
-//  OCR 识别结果确认 BottomSheet
-// ─────────────────────────────────────────────────────────
+//  鐎瑰本鍨氬鍦崶
 class _OcrConfirmSheet extends StatefulWidget {
   final SwimOcrResult result;
   final void Function(SwimOcrResult result, Set<String> accepted) onConfirm;
@@ -1762,7 +1711,6 @@ class _OcrConfirmSheet extends StatefulWidget {
 }
 
 class _OcrConfirmSheetState extends State<_OcrConfirmSheet> {
-  // 默认全部勾选已识别到的字段
   late final Set<String> _accepted;
 
   @override
@@ -1791,123 +1739,117 @@ class _OcrConfirmSheetState extends State<_OcrConfirmSheet> {
     final isDark = theme.brightness == Brightness.dark;
     final r = widget.result;
 
-    // ── 可填入表单的通用字段 ─────────────────────────────
     final coreItems = <_OcrItem>[
       _OcrItem(
         key: 'distance',
-        label: '总距离',
-        value: r.distanceMeters != null ? '${r.distanceMeters} 米' : null,
+        label: '鎬昏窛绂?,
+        value: r.distanceMeters != null ? '${r.distanceMeters} 绫? : null,
         icon: Icons.pool_outlined,
         fillable: true,
       ),
       _OcrItem(
         key: 'duration',
-        label: '运动时长',
+        label: '杩愬姩鏃堕暱',
         value: r.durationRaw ??
-            (r.durationMinutes != null ? '${r.durationMinutes} 分钟' : null),
+            (r.durationMinutes != null ? '${r.durationMinutes} 鍒嗛挓' : null),
         icon: Icons.timer_outlined,
         fillable: true,
       ),
       _OcrItem(
         key: 'calories',
-        label: '卡路里',
-        value: r.calories != null ? '${r.calories} 千卡' : null,
+        label: '鍗¤矾閲?,
+        value: r.calories != null ? '${r.calories} 鍗冨崱' : null,
         icon: Icons.local_fire_department_outlined,
         fillable: true,
       ),
       _OcrItem(
         key: 'avgHR',
-        label: '平均心率',
+        label: '骞冲潎蹇冪巼',
         value: r.avgHeartRate != null ? '${r.avgHeartRate} bpm' : null,
         icon: Icons.favorite_outline,
         fillable: true,
-      ),
+        label: '最大心率',
       _OcrItem(
         key: 'maxHR',
-        label: '最大心率',
+        label: '鏈€澶у績鐜?,
         value: r.maxHeartRate != null ? '${r.maxHeartRate} bpm' : null,
         icon: Icons.monitor_heart_outlined,
         fillable: true,
-      ),
+        label: '主泳姿',
       _OcrItem(
         key: 'swimStyle',
-        label: '主泳姿',
+        label: '涓绘吵濮?,
         value: r.swimStyle,
         icon: Icons.waves_outlined,
         fillable: true,
-      ),
-      _OcrItem(
-        key: 'laps',
         label: '趟数',
-        value: r.laps != null ? '${r.laps} 趟' : null,
+        value: r.laps != null ? ' 趟' : null,
+        key: 'laps',
+        label: '瓒熸暟',
+        value: r.laps != null ? '${r.laps} 瓒? : null,
         icon: Icons.repeat_outlined,
         fillable: true,
-      ),
-      _OcrItem(
-        key: 'poolLength',
         label: '泳池长度',
-        value: r.poolLength != null ? '${r.poolLength} 米' : null,
+        value: r.poolLength != null ? ' 米' : null,
+        key: 'poolLength',
+        label: '娉虫睜闀垮害',
+        value: r.poolLength != null ? '${r.poolLength} 绫? : null,
         icon: Icons.straighten_outlined,
         fillable: true,
-      ),
-      _OcrItem(
-        key: 'avgPace',
         label: '平均配速',
-        value: r.avgPace != null ? '${r.avgPace} /100米' : null,
+        value: r.avgPace != null ? ' /100米' : null,
+        key: 'avgPace',
+        label: '骞冲潎閰嶉€?,
+        value: r.avgPace != null ? '${r.avgPace} /100绫? : null,
         icon: Icons.speed_outlined,
         fillable: true,
-      ),
-      _OcrItem(
-        key: 'strokeCount',
         label: '划水次数',
-        value: r.strokeCount != null ? '${r.strokeCount} 次' : null,
+        value: r.strokeCount != null ? ' 次' : null,
+        key: 'strokeCount',
+        label: '鍒掓按娆℃暟',
+        value: r.strokeCount != null ? '${r.strokeCount} 娆? : null,
         icon: Icons.water_drop_outlined,
         fillable: true,
       ),
     ];
 
-    // ── 小米专有字段 ─────────────────────────────────────
-    final xiaomiItems = <_OcrItem>[
-      _OcrItem(
-        key: 'bestPace',
         label: '最佳配速',
-        value: r.bestPace != null ? '${r.bestPace} /100米' : null,
+        value: r.bestPace != null ? ' /100米' : null,
+        key: 'bestPace',
+        label: '鏈€浣抽厤閫?,
+        value: r.bestPace != null ? '${r.bestPace} /100绫? : null,
         icon: Icons.rocket_launch_outlined,
         fillable: true,
-      ),
+        label: '平均 SWOLF',
       _OcrItem(
         key: 'swolfAvg',
-        label: '平均 SWOLF',
+        label: '骞冲潎 SWOLF',
         value: r.swolfAvg != null ? '${r.swolfAvg}' : null,
         icon: Icons.water_outlined,
         fillable: true,
-      ),
+        label: '最佳 SWOLF',
       _OcrItem(
         key: 'swolfBest',
-        label: '最低 SWOLF',
+        label: '鏈€浣?SWOLF',
         value: r.swolfBest != null ? '${r.swolfBest}' : null,
         icon: Icons.star_outline,
         fillable: true,
-      ),
-      _OcrItem(
-        key: 'strokeRate',
         label: '平均划频',
-        value: r.strokeRate != null ? '${r.strokeRate} 次/趟' : null,
+        value: r.strokeRate != null ? ' 次/趟' : null,
+        key: 'strokeRate',
+        label: '骞冲潎鍒掗',
+        value: r.strokeRate != null ? '${r.strokeRate} 娆?瓒? : null,
         icon: Icons.rowing_outlined,
         fillable: true,
       ),
     ];
 
-    // 只有小米来源（或 unknown 有小米字段）时才展示小米专区
     final hasXiaomiData = r.bestPace != null ||
         r.swolfAvg != null ||
         r.swolfBest != null ||
         r.strokeRate != null;
 
-    // ── 来源标签颜色 ─────────────────────────────────────
     Color brandColor;
-    String brandEmoji;
-    switch (r.sourceBrand) {
       case OcrSourceBrand.huawei:
         brandColor = const Color(0xFFCF0A2C); // 华为红
         brandEmoji = '🔴';
@@ -1936,7 +1878,7 @@ class _OcrConfirmSheetState extends State<_OcrConfirmSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 拖动条
+          // 閹锋牕濮╅弶?
           Center(
             child: Container(
               width: 36,
@@ -1949,13 +1891,13 @@ class _OcrConfirmSheetState extends State<_OcrConfirmSheet> {
           ),
           const SizedBox(height: 16),
 
-          // 标题行
+          // 閺嶅洭顣界悰?
           Row(
             children: [
-              const Text('🔍', style: TextStyle(fontSize: 20)),
+              const Text('馃摮', style: TextStyle(fontSize: 20)),
               const SizedBox(width: 8),
               Expanded(
-                child: Text('识别结果确认',
+                child: Text('璇嗗埆缁撴灉纭',
                     style: theme.textTheme.headlineMedium),
               ),
               if (widget.imageCount > 1)
@@ -1978,7 +1920,6 @@ class _OcrConfirmSheetState extends State<_OcrConfirmSheet> {
           ),
           const SizedBox(height: 6),
 
-          // 来源标签
           Row(
             children: [
               Container(
@@ -1997,7 +1938,7 @@ class _OcrConfirmSheetState extends State<_OcrConfirmSheet> {
                         style: const TextStyle(fontSize: 12)),
                     const SizedBox(width: 5),
                     Text(
-                      '识别来源：${r.sourceBrand.displayName}',
+                      '璇嗗埆鏉ユ簮锛?{r.sourceBrand.displayName}',
                       style: TextStyle(
                         color: brandColor,
                         fontSize: 12,
@@ -2012,21 +1953,18 @@ class _OcrConfirmSheetState extends State<_OcrConfirmSheet> {
           const SizedBox(height: 6),
 
           Text(
-            '✅ 勾选的字段将填入表单，可取消勾选',
+            '鍕鹃€夌殑瀛楁灏嗗～鍏ヨ〃鍗曪紝涔熷彲浠ュ彇娑堝嬀閫夈€?,
             style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
           ),
           const SizedBox(height: 14),
 
-          // 字段列表（可滚动）
           Flexible(
             child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 通用字段
                   ...coreItems.map((item) => _buildOcrRow(item, theme)),
 
-                  // 小米专有字段区块
                   if (hasXiaomiData) ...[
                     const SizedBox(height: 8),
                     Row(
@@ -2037,7 +1975,7 @@ class _OcrConfirmSheetState extends State<_OcrConfirmSheet> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          '小米专有数据',
+                          '灏忕背涓撴湁鏁版嵁',
                           style: theme.textTheme.bodySmall
                               ?.copyWith(color: Colors.grey),
                         ),
@@ -2057,7 +1995,7 @@ class _OcrConfirmSheetState extends State<_OcrConfirmSheet> {
 
           const SizedBox(height: 16),
 
-          // 底部按钮
+          // 鎼存洟鍎撮幐澶愭尦
           SizedBox(
             width: double.infinity,
             height: 50,
@@ -2074,7 +2012,7 @@ class _OcrConfirmSheetState extends State<_OcrConfirmSheet> {
                 ),
               ),
               child: const Text(
-                '填入表单',
+                '濉叆琛ㄥ崟',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
@@ -2086,11 +2024,10 @@ class _OcrConfirmSheetState extends State<_OcrConfirmSheet> {
 
   Widget _buildOcrRow(_OcrItem item, ThemeData theme) {
     final recognized = item.value != null;
-    // 不可填入的字段（仅展示）不参与勾选交互
     final canToggle = recognized && item.fillable;
     final checked = item.fillable && _accepted.contains(item.key);
 
-    // 颜色方案
+    // 妫版粏澹婇弬瑙勵攳
     late Color borderColor;
     late Color bgColor;
     Color valueColor;
@@ -2102,7 +2039,7 @@ class _OcrConfirmSheetState extends State<_OcrConfirmSheet> {
       valueColor = Colors.grey.shade400;
       valueFW = FontWeight.normal;
     } else if (!item.fillable) {
-      // 仅展示：蓝灰色调
+      // 娴犲懎鐫嶇粈鐚寸窗閽冩繄浼嗛懝鑼剁殶
       borderColor = Colors.blueGrey.withValues(alpha:0.25);
       bgColor = Colors.blueGrey.withValues(alpha:0.05);
       valueColor = Colors.blueGrey.shade600;
@@ -2142,8 +2079,7 @@ class _OcrConfirmSheetState extends State<_OcrConfirmSheet> {
           ),
           child: Row(
             children: [
-              // 图标
-              Icon(
+              // 閸ョ偓鐖?              Icon(
                 item.icon,
                 size: 20,
                 color: recognized
@@ -2152,8 +2088,7 @@ class _OcrConfirmSheetState extends State<_OcrConfirmSheet> {
               ),
               const SizedBox(width: 12),
 
-              // 标签
-              SizedBox(
+              // 閺嶅洨顒?              SizedBox(
                 width: 80,
                 child: Text(
                   item.label,
@@ -2164,10 +2099,10 @@ class _OcrConfirmSheetState extends State<_OcrConfirmSheet> {
                 ),
               ),
 
-              // 值
+              // 閸?
               Expanded(
                 child: Text(
-                  recognized ? item.value! : '未识别到',
+                  recognized ? item.value! : '鏈瘑鍒埌',
                   style: TextStyle(
                     color: valueColor,
                     fontWeight: valueFW,
@@ -2177,9 +2112,8 @@ class _OcrConfirmSheetState extends State<_OcrConfirmSheet> {
                 ),
               ),
 
-              // 状态图标
+              // 閻樿埖鈧礁娴橀弽?
               if (!item.fillable && recognized)
-                // 仅展示标记
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -2188,7 +2122,7 @@ class _OcrConfirmSheetState extends State<_OcrConfirmSheet> {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: const Text(
-                    '参考',
+                    '鍙傝€?,
                     style: TextStyle(
                         fontSize: 10,
                         color: Colors.blueGrey,
@@ -2214,14 +2148,12 @@ class _OcrConfirmSheetState extends State<_OcrConfirmSheet> {
   }
 }
 
-/// OCR 字段条目描述
 class _OcrItem {
   final String key;
   final String label;
   final String? value;
   final IconData icon;
 
-  /// 该字段是否可填入表单（false = 仅展示参考）
   final bool fillable;
 
   const _OcrItem({

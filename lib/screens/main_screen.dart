@@ -15,10 +15,17 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0; // 0=home 1=calendar 2=stats 3=profile
+  DateTime? _selectedDateFromCalendar;
 
-  final List<Widget> _screens = [
+  List<Widget> get _screens => [
     const HomeScreen(),
-    CalendarScreen(),
+    CalendarScreen(
+      onDaySelected: (date) {
+        setState(() {
+          _selectedDateFromCalendar = date;
+        });
+      },
+    ),
     const StatsScreen(),
     const ProfileScreen(),
   ];
@@ -91,11 +98,17 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _showWorkoutSelector() {
+    DateTime? initialDate;
+    // 如果当前在日历页面，使用选中的日期
+    if (_currentIndex == 1) {
+      initialDate = _selectedDateFromCalendar;
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const WorkoutTypeSelectorSheet(),
+      builder: (_) => WorkoutTypeSelectorSheet(initialDate: initialDate),
     );
   }
 }

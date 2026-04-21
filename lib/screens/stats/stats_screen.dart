@@ -1279,9 +1279,9 @@ class _YearHeatmapFullscreenDialogState extends State<_YearHeatmapFullscreenDial
   Color _activityColor(int cal) {
     if (cal == 0) return widget.isDark ? const Color(0xFF2D3566) : const Color(0xFFEBEDF0);
     if (cal <= 200) return widget.isDark ? const Color(0xFF3D4580) : const Color(0xFFEFE8FF);
-    if (cal <= 500) return widget.isDark ? const Color(0xFF5D65B0) : const Color(0xFFCDBDFB);
-    if (cal <= 800) return widget.isDark ? const Color(0xFF7B82D5) : const Color(0xFF9F87F5);
-    if (cal <= 1200) return widget.isDark ? const Color(0xFF9F9FE8) : const Color(0xFF6B5EE6);
+    if (cal <= 400) return widget.isDark ? const Color(0xFF5D65B0) : const Color(0xFFCDBDFB);
+    if (cal <= 600) return widget.isDark ? const Color(0xFF7B82D5) : const Color(0xFF9F87F5);
+    if (cal <= 800) return widget.isDark ? const Color(0xFF9F9FE8) : const Color(0xFF6B5EE6);
     return widget.isDark ? const Color(0xFFBDBDFA) : const Color(0xFF4C3FD9);
   }
 }

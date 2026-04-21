@@ -64,7 +64,7 @@ void main() {
         GymExercise(name: '引体向上', muscleGroup: MuscleGroup.back, sets: [
           GymSet(reps: 8, weight: 0, durationSeconds: 0, isBodyweight: true),
         ]),
-        GymExercise(name: '驴踢', muscleGroup: MuscleGroup.glutes, sets: [
+        GymExercise(name: '腿举', muscleGroup: MuscleGroup.glutesAndLegs, sets: [
           GymSet(reps: 12, weight: 0, durationSeconds: 0, isBodyweight: true),
         ]),
         GymExercise(name: '侧平举', muscleGroup: MuscleGroup.shoulders, sets: [
@@ -84,7 +84,7 @@ void main() {
 
       expect(deserialized.exercises!.length, 3);
       expect(deserialized.exercises![0].muscleGroup, MuscleGroup.back);
-      expect(deserialized.exercises![1].muscleGroup, MuscleGroup.glutes);
+      expect(deserialized.exercises![1].muscleGroup, MuscleGroup.glutesAndLegs);
       expect(deserialized.exercises![2].muscleGroup, MuscleGroup.shoulders);
     });
 

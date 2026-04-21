@@ -7,7 +7,8 @@ import '../../widgets/motivation_dialogs.dart';
 
 class OtherActivityScreen extends StatefulWidget {
   final WorkoutSession? editSession;
-  const OtherActivityScreen({super.key, this.editSession});
+  final DateTime? initialDate;
+  const OtherActivityScreen({super.key, this.editSession, this.initialDate});
 
   @override
   State<OtherActivityScreen> createState() => _OtherActivityScreenState();
@@ -31,9 +32,9 @@ class _OtherActivityScreenState extends State<OtherActivityScreen> {
       _startDate = s.date;
       _endDate = s.endDate ?? s.date;
     } else {
-      final now = DateTime.now();
-      _startDate = DateTime(now.year, now.month, now.day);
-      _endDate = DateTime(now.year, now.month, now.day);
+      final initial = widget.initialDate ?? DateTime.now();
+      _startDate = DateTime(initial.year, initial.month, initial.day);
+      _endDate = DateTime(initial.year, initial.month, initial.day);
     }
   }
 

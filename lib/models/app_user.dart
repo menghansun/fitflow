@@ -14,17 +14,17 @@ class AppUser extends HiveObject {
   String? avatarEmoji;
 
   @HiveField(3)
-  late int themeModeIndex; // 0=system, 1=light, 2=dark
+  late DateTime createdAt;
 
   @HiveField(4)
-  late DateTime createdAt;
+  double? height; // 身高 (cm)
 
   AppUser({
     required this.id,
     required this.nickname,
     this.avatarEmoji,
-    this.themeModeIndex = 0,
     required this.createdAt,
+    this.height,
   });
 
   static const List<String> defaultAvatars = [

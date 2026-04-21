@@ -330,9 +330,6 @@ class MuscleGroupAdapter extends TypeAdapter<MuscleGroup> {
         return MuscleGroup.back;
       case 2:
         return MuscleGroup.glutesAndLegs;
-      case 3:
-        // 兼容旧数据 glutes -> glutesAndLegs
-        return MuscleGroup.glutesAndLegs;
       case 4:
         return MuscleGroup.shoulders;
       case 5:

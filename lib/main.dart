@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
@@ -121,7 +122,7 @@ class _FitFlowAppState extends State<FitFlowApp> {
                 });
               }
 
-              final themeMode = userProvider.currentThemeMode;
+              const themeMode = ThemeMode.system;
               return _buildMaterialApp(
                 themeMode,
                 const MainScreen(),
@@ -142,6 +143,15 @@ class _FitFlowAppState extends State<FitFlowApp> {
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
       locale: const Locale('zh', 'CN'),
+      supportedLocales: const [
+        Locale('zh', 'CN'),
+        Locale('en', 'US'),
+      ],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       home: home,
     );
   }

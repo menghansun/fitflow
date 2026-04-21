@@ -52,8 +52,8 @@ class SupabaseService {
   Future<void> saveProfile({
     required String nickname,
     String? avatarEmoji,
-    int? themeModeIndex,
     DateTime? createdAt,
+    double? height,
   }) async {
     final userId = uid;
     if (userId == null) return;
@@ -62,8 +62,8 @@ class SupabaseService {
       'id': userId,
       'nickname': nickname,
       'avatar_emoji': avatarEmoji,
-      'theme_mode_index': themeModeIndex ?? 0,
       'created_at': (createdAt ?? DateTime.now()).toIso8601String(),
+      'height': height,
     });
   }
 

@@ -90,11 +90,6 @@ class ProfileScreen extends StatelessWidget {
 
               const SizedBox(height: 24),
 
-              // ── Settings section ───────────────
-              _SectionHeader('主题设置'),
-              _ThemeSelector(user: user, userProvider: userProvider),
-
-              const SizedBox(height: 20),
               _SectionHeader('账户'),
 
               // Edit nickname / avatar
@@ -239,6 +234,7 @@ class ProfileScreen extends StatelessWidget {
   void _showEditProfile(
       BuildContext context, AppUser user, UserProvider userProvider) {
     final nicknameCtrl = TextEditingController(text: user.nickname);
+    final heightCtrl = TextEditingController(text: user.height?.toString() ?? '');
     String selectedEmoji = user.avatarEmoji ?? '💪';
 
     showModalBottomSheet(
@@ -330,6 +326,15 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   maxLength: 12,
                 ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: heightCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: '身高 (cm)',
+                    prefixIcon: Icon(Icons.height),
+                  ),
+                ),
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
@@ -339,6 +344,7 @@ class ProfileScreen extends StatelessWidget {
                       if (name.isEmpty) return;
                       user.nickname = name;
                       user.avatarEmoji = selectedEmoji;
+                      user.height = double.tryParse(heightCtrl.text);
                       await userProvider.updateUser(user);
                       if (ctx2.mounted) Navigator.pop(ctx2);
                     },
@@ -545,18 +551,7 @@ class _MiniStat extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Text(icon, style: const TextStyle(fontSize: 20)),
-              const Spacer(),
-              Container(
-                width: 8, height: 8,
-                decoration: BoxDecoration(
-                  color: color, shape: BoxShape.circle,
-                ),
-              ),
-            ],
-          ),
+          Text(icon, style: const TextStyle(fontSize: 20)),
           const SizedBox(height: 8),
           Text(
             value,
@@ -578,72 +573,6 @@ class _MiniStat extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _ThemeSelector extends StatelessWidget {
-  final AppUser user;
-  final UserProvider userProvider;
-
-  const _ThemeSelector(
-      {required this.user, required this.userProvider});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primary = theme.colorScheme.primary;
-    final options = [
-      (ThemeMode.system, '🌓', '跟随系统'),
-      (ThemeMode.light, '☀️', '浅色'),
-      (ThemeMode.dark, '🌙', '深色'),
-    ];
-
-    return Row(
-      children: options.map((opt) {
-        final (mode, emoji, label) = opt;
-        final selected = user.themeModeIndex == mode.index;
-        return Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: GestureDetector(
-              onTap: () => userProvider.setThemeMode(mode),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  color: selected
-                      ? primary.withValues(alpha:0.15)
-                      : (isDark
-                          ? AppColors.darkCard
-                          : Colors.white),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: selected ? primary : Colors.transparent,
-                    width: 2,
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    Text(emoji,
-                        style: const TextStyle(fontSize: 22)),
-                    const SizedBox(height: 4),
-                    Text(label,
-                        style: TextStyle(
-                          color: selected ? primary : null,
-                          fontWeight: selected
-                              ? FontWeight.w600
-                              : FontWeight.normal,
-                          fontSize: 12,
-                        )),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      }).toList(),
     );
   }
 }

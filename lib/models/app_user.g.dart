@@ -20,8 +20,8 @@ class AppUserAdapter extends TypeAdapter<AppUser> {
       id: fields[0] as String,
       nickname: fields[1] as String,
       avatarEmoji: fields[2] as String?,
-      themeModeIndex: fields[3] as int,
-      createdAt: fields[4] as DateTime,
+      createdAt: fields[3] as DateTime,
+      height: fields[4] as double?,
     );
   }
 
@@ -36,9 +36,9 @@ class AppUserAdapter extends TypeAdapter<AppUser> {
       ..writeByte(2)
       ..write(obj.avatarEmoji)
       ..writeByte(3)
-      ..write(obj.themeModeIndex)
+      ..write(obj.createdAt)
       ..writeByte(4)
-      ..write(obj.createdAt);
+      ..write(obj.height);
   }
 
   @override

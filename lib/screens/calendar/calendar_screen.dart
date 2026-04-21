@@ -9,7 +9,8 @@ import '../../widgets/session_card.dart';
 import '../session_detail_screen.dart';
 
 class CalendarScreen extends StatefulWidget {
-  const CalendarScreen({super.key});
+  final ValueChanged<DateTime>? onDaySelected;
+  const CalendarScreen({super.key, this.onDaySelected});
 
   @override
   State<CalendarScreen> createState() => _CalendarScreenState();
@@ -31,31 +32,35 @@ class _CalendarScreenState extends State<CalendarScreen> {
     setState(() {
       _focusedMonth =
           DateTime(_focusedMonth.year, _focusedMonth.month - 1, 1);
-      if (_selectedDay.year != _focusedMonth.year ||
-          _selectedDay.month != _focusedMonth.month) {
-        _selectedDay = _focusedMonth;
-      }
+      // 切换月份后重置为今天
+      final now = DateTime.now();
+      _selectedDay = DateTime(now.year, now.month, now.day);
     });
+    // 通知父组件日期已重置
+    widget.onDaySelected?.call(_selectedDay);
   }
 
   void _nextMonth() {
     setState(() {
       _focusedMonth =
           DateTime(_focusedMonth.year, _focusedMonth.month + 1, 1);
-      if (_selectedDay.year != _focusedMonth.year ||
-          _selectedDay.month != _focusedMonth.month) {
-        _selectedDay = _focusedMonth;
-      }
+      // 切换月份后重置为今天
+      final now = DateTime.now();
+      _selectedDay = DateTime(now.year, now.month, now.day);
     });
+    // 通知父组件日期已重置
+    widget.onDaySelected?.call(_selectedDay);
   }
 
   void _jumpToMonth(int year, int month) {
     setState(() {
       _focusedMonth = DateTime(year, month, 1);
-      if (_selectedDay.year != year || _selectedDay.month != month) {
-        _selectedDay = _focusedMonth;
-      }
+      // 切换月份后重置为今天
+      final now = DateTime.now();
+      _selectedDay = DateTime(now.year, now.month, now.day);
     });
+    // 通知父组件日期已重置
+    widget.onDaySelected?.call(_selectedDay);
   }
 
   Future<void> _showMonthPicker(BuildContext context) async {
@@ -254,8 +259,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     onPrev: _prevMonth,
                     onNext: _nextMonth,
                     onTitleTap: () => _showMonthPicker(context),
-                    onDayTap: (day) =>
-                        setState(() => _selectedDay = day),
+                    onDayTap: (day) {
+                        setState(() => _selectedDay = day);
+                        widget.onDaySelected?.call(day);
+                      },
                   ),
                 ),
               ),

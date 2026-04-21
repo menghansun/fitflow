@@ -24,7 +24,8 @@ enum _CardioType {
 // ─────────────────────────────────────────────────────────
 class CardioRecordScreen extends StatefulWidget {
   final WorkoutSession? editSession;
-  const CardioRecordScreen({super.key, this.editSession});
+  final DateTime? initialDate;
+  const CardioRecordScreen({super.key, this.editSession, this.initialDate});
 
   @override
   State<CardioRecordScreen> createState() => _CardioRecordScreenState();
@@ -95,7 +96,7 @@ class _CardioRecordScreenState extends State<CardioRecordScreen> {
         }
       }
     } else {
-      _date = DateTime.now();
+      _date = widget.initialDate ?? DateTime.now();
     }
   }
 
