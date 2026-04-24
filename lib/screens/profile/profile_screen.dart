@@ -1,17 +1,18 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:file_picker/file_picker.dart';
+
+import '../../models/app_user.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/workout_provider.dart';
-import '../../providers/achievement_provider.dart';
-import '../../models/app_user.dart';
-import '../../theme/app_theme.dart';
 import '../../services/export_import_service.dart';
 import '../../services/supabase_service.dart';
-import '../gym/exercise_gallery_screen.dart';
-import 'monthly_report_screen.dart';
-import 'achievement_screen.dart';
+import '../../theme/app_theme.dart';
 import '../body_metrics/body_metrics_screen.dart';
+import '../gym/exercise_gallery_screen.dart';
+import 'achievement_screen.dart';
+import 'monthly_report_screen.dart';
+import 'training_plan_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -28,7 +29,11 @@ class ProfileScreen extends StatelessWidget {
     }
   }
 
-  static Future<void> _importData(BuildContext context, AppUser user, WorkoutProvider workoutProvider) async {
+  static Future<void> _importData(
+    BuildContext context,
+    AppUser user,
+    WorkoutProvider workoutProvider,
+  ) async {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -41,6 +46,7 @@ class ProfileScreen extends StatelessWidget {
       final count = await ExportImportService.importFromJson(user.id, json);
       await workoutProvider.syncAllToCloud();
       workoutProvider.refresh();
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('成功导入 $count 条记录并同步到云端')),
@@ -58,172 +64,202 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('我的')),
+      backgroundColor: const Color(0xFFF4F7FB),
+      appBar: AppBar(
+        title: const Text('我的'),
+        backgroundColor: const Color(0xFFF4F7FB),
+      ),
       body: Consumer2<UserProvider, WorkoutProvider>(
         builder: (context, userProvider, workoutProvider, _) {
           final theme = Theme.of(context);
           final user = userProvider.currentUser;
-          if (user == null) return const Center(child: CircularProgressIndicator());
+          if (user == null) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-          final totalSessions = workoutProvider.sessions.where((s) => s.countsAsWorkout).length;
+          final totalSessions =
+              workoutProvider.sessions.where((s) => s.countsAsWorkout).length;
           final totalMins = workoutProvider.sessions
                   .where((s) => s.countsAsWorkout)
-                  .fold(
-                  0, (s, w) => s + w.durationSeconds) ~/
+                  .fold<int>(0, (sum, item) => sum + item.durationSeconds) ~/
               60;
 
           return ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
             children: [
-              const SizedBox(height: 20),
-
-              // ── User header ─────────────────────
-              _UserHeader(user: user),
-
-              const SizedBox(height: 20),
-
-              // ── Stats summary ──────────────────
-              _LifetimeStats(
+              _HeroProfileCard(
+                user: user,
                 totalSessions: totalSessions,
                 totalMins: totalMins,
+                onTapEdit: () => _showEditProfile(context, user, userProvider),
               ),
-
-              const SizedBox(height: 24),
-
-              _SectionHeader('账户'),
-
-              // Edit nickname / avatar
-              _SettingsTile(
-                icon: Icons.edit_outlined,
-                title: '编辑资料',
-                subtitle: '修改昵称和头像',
-                onTap: () => _showEditProfile(context, user, userProvider),
-              ),
-
-              _SettingsTile(
-                icon: Icons.bar_chart_rounded,
-                title: '游泳报告',
-                subtitle: '查看本月训练总结',
-                onTap: () {
-                  final now = DateTime.now();
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => MonthlyReportScreen(year: now.year, month: now.month, userId: user.id),
-                    ),
-                  );
-                },
-              ),
-
-              _SettingsTile(
-                icon: Icons.emoji_events_outlined,
-                title: '我的成就',
-                subtitle: '查看已解锁的成就',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const AchievementScreen(),
-                    ),
-                  );
-                },
-              ),
-
-              const SizedBox(height: 20),
-              _SectionHeader('健康'),
-
-              _SettingsTile(
-                icon: Icons.monitor_weight_outlined,
-                title: '身体指标',
-                subtitle: '体重、BMI、体脂率、肌肉含量等',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const BodyMetricsScreen(),
-                    ),
-                  );
-                },
-              ),
-
-              const SizedBox(height: 20),
-              _SectionHeader('健身'),
-
-              _SettingsTile(
-                icon: Icons.fitness_center_outlined,
-                title: '动作库',
-                subtitle: '浏览所有健身动作，支持查看示范视频',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const ExerciseGalleryScreen()),
-                ),
-              ),
-
-              const SizedBox(height: 20),
-              _SectionHeader('数据'),
-
-              _SettingsTile(
-                icon: Icons.upload_outlined,
-                title: '导出数据',
-                subtitle: '将所有运动记录导出为 JSON 文件',
-                onTap: () => _exportData(context, user),
-              ),
-
-              _SettingsTile(
-                icon: Icons.download_outlined,
-                title: '导入数据',
-                subtitle: '从 JSON 文件恢复运动记录',
-                onTap: () => _importData(context, user, workoutProvider),
-              ),
-
-              _SettingsTile(
-                icon: Icons.cloud_upload_outlined,
-                title: '同步到云端',
-                subtitle: '将本地记录上传到 Supabase',
-                onTap: () async {
-                  try {
-                    await workoutProvider.syncAllToCloud();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('已同步到云端')),
+              const SizedBox(height: 12),
+              _ProfileGroupCard(
+                title: '账户',
+                children: [
+                  _ProfileMenuTile(
+                    icon: Icons.edit_outlined,
+                    color: const Color(0xFF4F46E5),
+                    title: '编辑资料',
+                    subtitle: '修改昵称、头像和身高',
+                    onTap: () => _showEditProfile(context, user, userProvider),
+                  ),
+                  _ProfileMenuTile(
+                    icon: Icons.bar_chart_rounded,
+                    color: const Color(0xFF0EA5E9),
+                    title: '游泳报告',
+                    subtitle: '查看本月训练总结',
+                    onTap: () {
+                      final now = DateTime.now();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => MonthlyReportScreen(
+                            year: now.year,
+                            month: now.month,
+                            userId: user.id,
+                          ),
+                        ),
                       );
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('同步失败: $e')),
+                    },
+                  ),
+                  _ProfileMenuTile(
+                    icon: Icons.emoji_events_outlined,
+                    color: const Color(0xFFF59E0B),
+                    title: '我的成就',
+                    subtitle: '查看已解锁的成就',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AchievementScreen(),
+                        ),
                       );
-                    }
-                  }
-                },
+                    },
+                  ),
+                ],
               ),
-
-              _SettingsTile(
-                icon: Icons.delete_outline,
-                title: '清空本用户数据',
-                subtitle: '删除所有运动记录（不可恢复）',
-                iconColor: Colors.red.shade300,
-                onTap: () => _confirmClear(context, workoutProvider),
+              const SizedBox(height: 14),
+              _ProfileGroupCard(
+                title: '健康',
+                children: [
+                  _ProfileMenuTile(
+                    icon: Icons.monitor_weight_outlined,
+                    color: const Color(0xFF14B8A6),
+                    title: '身体指标',
+                    subtitle: '体重、BMI、体脂率、肌肉含量等',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const BodyMetricsScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
-
-              _SettingsTile(
-                icon: Icons.logout,
-                title: '退出登录',
-                subtitle: '切换到其他账户',
-                iconColor: Colors.orange,
-                onTap: () => SupabaseService.logout(),
+              const SizedBox(height: 14),
+              _ProfileGroupCard(
+                title: '健身',
+                children: [
+                  _ProfileMenuTile(
+                    icon: Icons.assignment_outlined,
+                    color: const Color(0xFF4F46E5),
+                    title: '训练计划',
+                    subtitle: '根据目标查看本周安排和今日建议',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const TrainingPlanScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  _ProfileMenuTile(
+                    icon: Icons.fitness_center_outlined,
+                    color: AppColors.gymAccent,
+                    title: '动作库',
+                    subtitle: '浏览所有健身动作，支持查看示范视频',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ExerciseGalleryScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
-
-              const SizedBox(height: 40),
+              const SizedBox(height: 14),
+              _ProfileGroupCard(
+                title: '数据',
+                children: [
+                  _ProfileMenuTile(
+                    icon: Icons.upload_outlined,
+                    color: const Color(0xFF10B981),
+                    title: '导出数据',
+                    subtitle: '将所有运动记录导出为 JSON 文件',
+                    onTap: () => _exportData(context, user),
+                  ),
+                  _ProfileMenuTile(
+                    icon: Icons.download_outlined,
+                    color: const Color(0xFF8B5CF6),
+                    title: '导入数据',
+                    subtitle: '从 JSON 文件恢复运动记录',
+                    onTap: () => _importData(context, user, workoutProvider),
+                  ),
+                  _ProfileMenuTile(
+                    icon: Icons.cloud_upload_outlined,
+                    color: const Color(0xFF14B8A6),
+                    title: '同步到云端',
+                    subtitle: '将本地记录上传到 Supabase',
+                    onTap: () async {
+                      try {
+                        await workoutProvider.syncAllToCloud();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('已同步到云端')),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('同步失败: $e')),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                  _ProfileMenuTile(
+                    icon: Icons.delete_outline,
+                    color: Colors.red.shade300,
+                    title: '清空本用户数据',
+                    subtitle: '删除所有运动记录（不可恢复）',
+                    onTap: () => _confirmClear(context, workoutProvider),
+                  ),
+                  _ProfileMenuTile(
+                    icon: Icons.logout,
+                    color: Colors.orange,
+                    title: '退出登录',
+                    subtitle: '切换到其他账户',
+                    onTap: () => SupabaseService.logout(),
+                    isLast: true,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 28),
               Center(
                 child: Text(
-                  'FitFlow v1.0.0\n💪 持续运动，记录成长',
+                  'FitFlow v1.0.0\n持续运动，记录成长',
                   textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFF94A3B8),
+                  ),
                 ),
               ),
-              const SizedBox(height: 40),
             ],
           );
         },
@@ -232,7 +268,10 @@ class ProfileScreen extends StatelessWidget {
   }
 
   void _showEditProfile(
-      BuildContext context, AppUser user, UserProvider userProvider) {
+    BuildContext context,
+    AppUser user,
+    UserProvider userProvider,
+  ) {
     final nicknameCtrl = TextEditingController(text: user.nickname);
     final heightCtrl = TextEditingController(text: user.height?.toString() ?? '');
     String selectedEmoji = user.avatarEmoji ?? '💪';
@@ -248,111 +287,116 @@ class ProfileScreen extends StatelessWidget {
           builder: (ctx2, setModalState) => Container(
             decoration: BoxDecoration(
               color: isDark ? AppColors.darkSurface : Colors.white,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(28)),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
             ),
             padding: EdgeInsets.fromLTRB(
-                24,
-                16,
-                24,
-                MediaQuery.of(ctx2).viewInsets.bottom + 32),
+              24,
+              16,
+              24,
+              MediaQuery.of(ctx2).viewInsets.bottom + 32,
+            ),
             child: SingleChildScrollView(
               child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 36, height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.withValues(alpha:0.3),
-                      borderRadius: BorderRadius.circular(2),
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                Text('编辑资料', style: theme.textTheme.headlineMedium),
-                const SizedBox(height: 20),
-                Center(
-                  child: Container(
-                    width: 72, height: 72,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withValues(alpha:0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(selectedEmoji,
-                          style: const TextStyle(fontSize: 36)),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8, runSpacing: 8,
-                  children: AppUser.defaultAvatars.map((e) {
-                    final sel = selectedEmoji == e;
-                    return GestureDetector(
-                      onTap: () => setModalState(() => selectedEmoji = e),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        width: 44, height: 44,
-                        decoration: BoxDecoration(
-                          color: sel
-                              ? theme.colorScheme.primary.withValues(alpha:0.2)
-                              : (isDark
-                                  ? AppColors.darkCard
-                                  : AppColors.lightBackground),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: sel
-                                ? theme.colorScheme.primary
-                                : Colors.transparent,
-                            width: 2,
-                          ),
-                        ),
-                        child: Center(
-                          child: Text(e, style: const TextStyle(fontSize: 22)),
+                  const SizedBox(height: 20),
+                  Text('编辑资料', style: theme.textTheme.headlineMedium),
+                  const SizedBox(height: 20),
+                  Center(
+                    child: Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          selectedEmoji,
+                          style: const TextStyle(fontSize: 36),
                         ),
                       ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: nicknameCtrl,
-                  decoration: const InputDecoration(
-                    labelText: '昵称',
-                    prefixIcon: Icon(Icons.person_outline),
+                    ),
                   ),
-                  maxLength: 12,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: heightCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: '身高 (cm)',
-                    prefixIcon: Icon(Icons.height),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: AppUser.defaultAvatars.map((emoji) {
+                      final selected = selectedEmoji == emoji;
+                      return GestureDetector(
+                        onTap: () => setModalState(() => selectedEmoji = emoji),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? theme.colorScheme.primary.withValues(alpha: 0.2)
+                                : (isDark ? AppColors.darkCard : AppColors.lightBackground),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: selected
+                                  ? theme.colorScheme.primary
+                                  : Colors.transparent,
+                              width: 2,
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(emoji, style: const TextStyle(fontSize: 22)),
+                          ),
+                        ),
+                      );
+                    }).toList(),
                   ),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      final name = nicknameCtrl.text.trim();
-                      if (name.isEmpty) return;
-                      user.nickname = name;
-                      user.avatarEmoji = selectedEmoji;
-                      user.height = double.tryParse(heightCtrl.text);
-                      await userProvider.updateUser(user);
-                      if (ctx2.mounted) Navigator.pop(ctx2);
-                    },
-                    child: const Text('保存'),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: nicknameCtrl,
+                    decoration: const InputDecoration(
+                      labelText: '昵称',
+                      prefixIcon: Icon(Icons.person_outline),
+                    ),
+                    maxLength: 12,
                   ),
-                ),
-              ],
-            ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: heightCtrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: '身高 (cm)',
+                      prefixIcon: Icon(Icons.height),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        final name = nicknameCtrl.text.trim();
+                        if (name.isEmpty) return;
+                        user.nickname = name;
+                        user.avatarEmoji = selectedEmoji;
+                        user.height = double.tryParse(heightCtrl.text);
+                        await userProvider.updateUser(user);
+                        if (ctx2.mounted) Navigator.pop(ctx2);
+                      },
+                      child: const Text('保存'),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -368,8 +412,9 @@ class ProfileScreen extends StatelessWidget {
         content: const Text('确定要删除所有运动记录吗？此操作不可恢复。'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('取消')),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
           TextButton(
             onPressed: () async {
               await workoutProvider.clearAll();
@@ -384,103 +429,100 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────
-//  Sub-widgets
-// ─────────────────────────────────────────────────────────
-
-class _UserHeader extends StatelessWidget {
+class _HeroProfileCard extends StatelessWidget {
   final AppUser user;
-  const _UserHeader({required this.user});
+  final int totalSessions;
+  final int totalMins;
+  final VoidCallback onTapEdit;
+
+  const _HeroProfileCard({
+    required this.user,
+    required this.totalSessions,
+    required this.totalMins,
+    required this.onTapEdit,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
-    final isDark = theme.brightness == Brightness.dark;
-
-    return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const BodyMetricsScreen()),
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: isDark
-                ? [primary.withValues(alpha:0.25), primary.withValues(alpha:0.1)]
-                : [primary.withValues(alpha:0.12), primary.withValues(alpha:0.04)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: primary.withValues(alpha:0.15)),
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF4F46E5), Color(0xFF0EA5E9)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: primary.withValues(alpha: isDark ? 0.3 : 0.2),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: primary.withValues(alpha:0.3),
-                  width: 2,
-                ),
-              ),
-              child: Center(
-                child: Text(user.avatarEmoji ?? '💪',
-                    style: const TextStyle(fontSize: 32)),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    user.nickname,
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '加入 FitFlow ${_daysSince(user.createdAt)} 天',
-                    style: TextStyle(
-                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: primary.withValues(alpha:0.12),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.verified, color: primary, size: 14),
-                  const SizedBox(width: 4),
-                  Text(
-                    '会员',
-                    style: TextStyle(
-                      color: primary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-            ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF4F46E5).withValues(alpha: 0.18),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
-    ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 30,
+                backgroundColor: Colors.white.withValues(alpha: 0.16),
+                child: Text(
+                  user.avatarEmoji ?? '💪',
+                  style: const TextStyle(fontSize: 28),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user.nickname,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '持续运动第 ${_daysSince(user.createdAt)} 天',
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                  ],
+                ),
+              ),
+              InkWell(
+                onTap: onTapEdit,
+                borderRadius: BorderRadius.circular(999),
+                child: const Padding(
+                  padding: EdgeInsets.all(6),
+                  child: Icon(Icons.edit_outlined, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: _ProfileTopStat(
+                  value: user.height != null ? user.height!.toStringAsFixed(0) : '--',
+                  label: '身高',
+                ),
+              ),
+              Expanded(
+                child: _ProfileTopStat(value: '$totalSessions', label: '累计训练'),
+              ),
+              Expanded(
+                child: _ProfileTopStat(value: '$totalMins', label: '总分钟'),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -489,31 +531,33 @@ class _UserHeader extends StatelessWidget {
   }
 }
 
-class _LifetimeStats extends StatelessWidget {
-  final int totalSessions;
-  final int totalMins;
-  const _LifetimeStats(
-      {required this.totalSessions, required this.totalMins});
+class _ProfileTopStat extends StatelessWidget {
+  final String value;
+  final String label;
+
+  const _ProfileTopStat({
+    required this.value,
+    required this.label,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _MiniStat(
-            icon: '🏃',
-            value: '$totalSessions',
-            label: '总运动次数',
-            color: AppColors.darkPrimary,
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
           ),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _MiniStat(
-            icon: '⏱️',
-            value: '$totalMins',
-            label: '总运动分钟',
-            color: AppColors.swimAccent,
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 12,
           ),
         ),
       ],
@@ -521,126 +565,121 @@ class _LifetimeStats extends StatelessWidget {
   }
 }
 
-class _MiniStat extends StatelessWidget {
-  final String icon;
-  final String value;
-  final String label;
-  final Color color;
+class _ProfileGroupCard extends StatelessWidget {
+  final String title;
+  final List<Widget> children;
 
-  const _MiniStat({
-    required this.icon,
-    required this.value,
-    required this.label,
-    required this.color,
+  const _ProfileGroupCard({
+    required this.title,
+    required this.children,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     return Container(
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.darkCard : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border(
-          left: BorderSide(color: color, width: 4),
-        ),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(icon, style: const TextStyle(fontSize: 20)),
-          const SizedBox(height: 8),
           Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              height: 1,
+            title,
+            style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF172033),
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
+          const SizedBox(height: 14),
+          ...children,
         ],
       ),
     );
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  const _SectionHeader(this.title);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Text(title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Theme.of(context).colorScheme.primary,
-              )),
-    );
-  }
-}
-
-class _SettingsTile extends StatelessWidget {
+class _ProfileMenuTile extends StatelessWidget {
   final IconData icon;
+  final Color color;
   final String title;
-  final String? subtitle;
-  final Color? iconColor;
+  final String subtitle;
   final VoidCallback onTap;
+  final bool isLast;
 
-  const _SettingsTile({
+  const _ProfileMenuTile({
     required this.icon,
+    required this.color,
     required this.title,
-    this.subtitle,
-    this.iconColor,
+    required this.subtitle,
     required this.onTap,
+    this.isLast = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkCard : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          children: [
-            Icon(icon,
-                size: 22,
-                color: iconColor ?? theme.colorScheme.primary),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: theme.textTheme.bodyLarge),
-                  if (subtitle != null)
-                    Text(subtitle!, style: theme.textTheme.bodyMedium),
-                ],
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: color),
               ),
-            ),
-            Icon(Icons.chevron_right,
-                color: theme.textTheme.bodyMedium?.color),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF172033),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: Color(0xFF6B7280),
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: Color(0xFF94A3B8),
+              ),
+            ],
+          ),
         ),
       ),
     );

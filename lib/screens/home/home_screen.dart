@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/workout_provider.dart';
 import '../../providers/user_provider.dart';
@@ -13,13 +12,11 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
       body: SafeArea(
         child: Consumer2<WorkoutProvider, UserProvider>(
           builder: (context, workoutProvider, userProvider, _) {
-            final user = userProvider.currentUser;
+            final theme = Theme.of(context);
             final now = DateTime.now();
             final weekStart =
                 now.subtract(Duration(days: now.weekday - 1));
@@ -36,78 +33,11 @@ class HomeScreen extends StatelessWidget {
 
             return CustomScrollView(
               slivers: [
-                // ── AppBar ──────────────────────────────
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(_getGreeting(),
-                                  style: theme.textTheme.bodyMedium),
-                              const SizedBox(height: 4),
-                              Text(
-                                user != null
-                                    ? '${user.nickname} 👋'
-                                    : '今日运动',
-                                style: theme.textTheme.headlineMedium,
-                              ),
-                            ],
-                          ),
-                        ),
-                        // ── 用户头像入口 ──
-                        GestureDetector(
-                          onTap: () => Navigator.pushNamed(context, '/profile'),
-                          child: Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.primary
-                                  .withValues(alpha:0.15),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: theme.colorScheme.primary
-                                    .withValues(alpha:0.4),
-                                width: 2,
-                              ),
-                            ),
-                            child: Center(
-                              child: Text(
-                                user?.avatarEmoji ?? '💪',
-                                style:
-                                    const TextStyle(fontSize: 24),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // ── Date ───────────────────────────────
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.fromLTRB(20, 4, 20, 0),
-                    child: Text(
-                      DateFormat('yyyy年MM月dd日 EEEE',
-                              'zh_CN')
-                          .format(now),
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  ),
-                ),
-
                 // ── Weekly card ─────────────────────────
                 SliverToBoxAdapter(
                   child: Padding(
                     padding:
-                        const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                        const EdgeInsets.fromLTRB(20, 12, 20, 0),
                     child: _WeeklySummaryCard(
                       weekCount: weekCount,
                       weekMins: weekMins,
@@ -190,14 +120,6 @@ class HomeScreen extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _getGreeting() {
-    final h = DateTime.now().hour;
-    if (h < 6) return '夜深了，注意休息 🌙';
-    if (h < 12) return '早上好！今天也要加油 ☀️';
-    if (h < 18) return '下午好，保持状态 💪';
-    return '晚上好，辛苦了 🌆';
   }
 }
 
@@ -303,7 +225,7 @@ class _ValueCardState extends State<_ValueCard> {
     final monthValue = widget.monthSessions * _price;
 
     // 计算回本倒计时
-    String _countdownText() {
+    String countdownText() {
       if (totalValue >= _targetValue) return '已达成';
       final remaining = _targetValue - totalValue;
       final sessionsNeeded = (remaining / _price).ceil();
@@ -529,7 +451,7 @@ class _ValueCardState extends State<_ValueCard> {
                           width: 1, height: 36, color: Colors.white12),
                       _MiniStat(
                         label: '回本倒计时',
-                        value: _countdownText(),
+                        value: countdownText(),
                         sub: totalValue >= _targetValue ? '🎉' : '坚持运动',
                       ),
                     ],
@@ -590,46 +512,54 @@ class _WeeklySummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primary = theme.colorScheme.primary;
-
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isDark
-              ? [const Color(0xFF1A2744), const Color(0xFF0D1E3D)]
-              : [const Color(0xFFEBF2FF), const Color(0xFFDCEBFF)],
+        borderRadius: BorderRadius.circular(28),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF4F46E5), Color(0xFF0EA5E9)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(20),
-        border:
-            Border.all(color: primary.withValues(alpha:0.3), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF4F46E5).withValues(alpha: 0.22),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('本周概览',
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(color: primary)),
-          const SizedBox(height: 16),
+          Text(
+            '本周概览',
+            style: TextStyle(color: Colors.white70, fontSize: 14),
+          ),
+          SizedBox(height: 14),
           Row(
             children: [
               Expanded(
-                  child: _StatItem(
-                      value: '$weekCount',
-                      label: '次运动',
-                      icon: '🏃')),
+                child: _WeeklyMetric(
+                  emoji: '🎯',
+                  value: '$weekCount',
+                  label: '次训练',
+                ),
+              ),
               Expanded(
-                  child: _StatItem(
-                      value: '$weekMins',
-                      label: '分钟',
-                      icon: '⏱️')),
+                child: _WeeklyMetric(
+                  emoji: '⏱️',
+                  value: '$weekMins',
+                  label: '分钟',
+                ),
+              ),
               Expanded(
-                  child: _StatItem(
-                      value: '$todayCount',
-                      label: '今日',
-                      icon: '📅')),
+                child: _WeeklyMetric(
+                  emoji: '📅',
+                  value: '$todayCount',
+                  label: '今日',
+                ),
+              ),
             ],
           ),
         ],
@@ -638,27 +568,35 @@ class _WeeklySummaryCard extends StatelessWidget {
   }
 }
 
-class _StatItem extends StatelessWidget {
+class _WeeklyMetric extends StatelessWidget {
+  const _WeeklyMetric({
+    required this.emoji,
+    required this.value,
+    required this.label,
+  });
+
+  final String emoji;
   final String value;
   final String label;
-  final String icon;
-
-  const _StatItem(
-      {required this.value,
-      required this.label,
-      required this.icon});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Column(
       children: [
-        Text(icon, style: const TextStyle(fontSize: 24)),
+        Text(emoji, style: const TextStyle(fontSize: 22)),
         const SizedBox(height: 6),
-        Text(value,
-            style: theme.textTheme.headlineMedium
-                ?.copyWith(color: theme.colorScheme.primary)),
-        Text(label, style: theme.textTheme.bodyMedium),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white70, fontSize: 13),
+        ),
       ],
     );
   }
@@ -839,9 +777,9 @@ class _QuickStartCard extends StatelessWidget {
   }
 }
 
-// ������������������������������������������������������������������������������������������������������������������
-//  ÿ��һ�俨Ƭ
-// ������������������������������������������������������������������������������������������������������������������
+// ─────────────────────────────────────────────────────────
+//  每日一句卡片
+// ─────────────────────────────────────────────────────────
 class _DailyQuoteCard extends StatelessWidget {
   const _DailyQuoteCard();
 

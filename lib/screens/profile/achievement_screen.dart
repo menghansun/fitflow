@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/achievement_provider.dart';
+
 import '../../models/achievement.dart';
-import '../../theme/app_theme.dart';
+import '../../providers/achievement_provider.dart';
 import '../../widgets/achievement_unlock_dialog.dart';
 
 class AchievementScreen extends StatelessWidget {
@@ -11,8 +11,10 @@ class AchievementScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF4F7FB),
       appBar: AppBar(
         title: const Text('我的成就'),
+        backgroundColor: const Color(0xFFF4F7FB),
         centerTitle: true,
       ),
       body: Consumer<AchievementProvider>(
@@ -21,30 +23,65 @@ class AchievementScreen extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
 
+          final focusAchievements = [...provider.achievements]
+            ..sort((a, b) {
+              final aScore = a.unlocked ? 2.0 : a.progress;
+              final bScore = b.unlocked ? 2.0 : b.progress;
+              return bScore.compareTo(aScore);
+            });
+
+          final spotlight = focusAchievements.where((item) => !item.unlocked).take(2).toList();
+          while (spotlight.length < 2 && spotlight.length < focusAchievements.length) {
+            spotlight.add(focusAchievements[spotlight.length]);
+          }
+
           return CustomScrollView(
             slivers: [
-              // 顶部统计
               SliverToBoxAdapter(
-                child: _AchievementHeader(
-                  unlocked: provider.unlockedCount,
-                  total: provider.totalCount,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _AchievementHeader(
+                        unlocked: provider.unlockedCount,
+                        total: provider.totalCount,
+                      ),
+                      const SizedBox(height: 18),
+                      if (spotlight.isNotEmpty) ...[
+                        const _HeaderTitle(title: '正在冲刺'),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            for (var i = 0; i < spotlight.length; i++) ...[
+                              Expanded(
+                                child: _SpotlightCard(achievement: spotlight[i]),
+                              ),
+                              if (i != spotlight.length - 1) const SizedBox(width: 12),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                      ],
+                      const _HeaderTitle(title: '分类墙'),
+                    ],
+                  ),
                 ),
               ),
-              // 成就列表
               SliverPadding(
-                padding: const EdgeInsets.all(16),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final category = provider.categories[index];
-                      final achievements = provider.getByCategory(category);
-                      return _AchievementSection(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                sliver: SliverList.builder(
+                  itemCount: provider.categories.length,
+                  itemBuilder: (context, index) {
+                    final category = provider.categories[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _AchievementShelf(
                         category: category,
-                        achievements: achievements,
-                      );
-                    },
-                    childCount: provider.categories.length,
-                  ),
+                        achievements: provider.getByCategory(category),
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
@@ -56,75 +93,68 @@ class AchievementScreen extends StatelessWidget {
 }
 
 class _AchievementHeader extends StatelessWidget {
-  final int unlocked;
-  final int total;
-
   const _AchievementHeader({
     required this.unlocked,
     required this.total,
   });
 
+  final int unlocked;
+  final int total;
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primary = theme.colorScheme.primary;
+    final progress = total == 0 ? 0.0 : unlocked / total;
 
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isDark
-              ? [primary.withValues(alpha: 0.3), primary.withValues(alpha: 0.1)]
-              : [primary.withValues(alpha: 0.15), primary.withValues(alpha: 0.05)],
+        borderRadius: BorderRadius.circular(28),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: primary.withValues(alpha: 0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F766E).withValues(alpha: 0.18),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text('🏆', style: TextStyle(fontSize: 48)),
-              const SizedBox(width: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '$unlocked / $total',
-                    style: theme.textTheme.headlineLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: primary,
-                    ),
-                  ),
-                  Text(
-                    '已解锁成就',
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                ],
+              const Text(
+                '成就总览',
+                style: TextStyle(color: Colors.white70),
+              ),
+              const Spacer(),
+              Text(
+                '$unlocked / $total',
+                style: const TextStyle(color: Colors.white),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: total > 0 ? unlocked / total : 0,
-              backgroundColor: isDark
-                  ? AppColors.darkCard
-                  : Colors.grey.shade200,
-              valueColor: AlwaysStoppedAnimation<Color>(primary),
-              minHeight: 8,
+          const SizedBox(height: 14),
+          Text(
+            '你已经完成 ${(progress * 100).toStringAsFixed(0)}%，继续保持训练节奏，下一批解锁会来得很快。',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              height: 1.28,
+              fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            '完成 ${((unlocked / total) * 100).toStringAsFixed(0)}%',
-            style: theme.textTheme.bodySmall,
+          const SizedBox(height: 18),
+          LinearProgressIndicator(
+            value: progress,
+            minHeight: 10,
+            borderRadius: const BorderRadius.all(Radius.circular(999)),
+            backgroundColor: const Color(0x33FFFFFF),
+            valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
           ),
         ],
       ),
@@ -132,236 +162,294 @@ class _AchievementHeader extends StatelessWidget {
   }
 }
 
-class _AchievementSection extends StatelessWidget {
-  final String category;
-  final List<Achievement> achievements;
+class _HeaderTitle extends StatelessWidget {
+  const _HeaderTitle({required this.title});
 
-  const _AchievementSection({
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 20,
+        fontWeight: FontWeight.w800,
+        color: Color(0xFF172033),
+      ),
+    );
+  }
+}
+
+class _SpotlightCard extends StatelessWidget {
+  const _SpotlightCard({required this.achievement});
+
+  final Achievement achievement;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _colorForCategory(AchievementDefinition.getCategory(achievement.type));
+    final remaining = achievement.targetValue - achievement.currentValue;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(achievement.icon, style: const TextStyle(fontSize: 28)),
+          const SizedBox(height: 10),
+          Text(
+            achievement.title,
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            achievement.unlocked ? '已解锁' : '还差 ${remaining > 0 ? remaining : 0}',
+            style: TextStyle(color: color, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 10),
+          LinearProgressIndicator(
+            value: achievement.unlocked ? 1 : achievement.progress,
+            minHeight: 8,
+            borderRadius: const BorderRadius.all(Radius.circular(999)),
+            backgroundColor: color.withValues(alpha: 0.12),
+            valueColor: AlwaysStoppedAnimation<Color>(color),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AchievementShelf extends StatelessWidget {
+  const _AchievementShelf({
     required this.category,
     required this.achievements,
   });
 
-  String get categoryIcon {
-    switch (category) {
-      case '游泳':
-        return '🏊';
-      case '健身':
-        return '💪';
-      case '连续':
-        return '🔥';
-      case '月度':
-        return '📅';
-      default:
-        return '🏅';
-    }
-  }
+  final String category;
+  final List<Achievement> achievements;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final unlockedCount = achievements.where((item) => item.unlocked).length;
+    final color = _colorForCategory(category);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(categoryIcon, style: const TextStyle(fontSize: 20)),
-            const SizedBox(width: 8),
-            Text(
-              category,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const Spacer(),
-            Text(
-              '${achievements.where((a) => a.unlocked).length}/${achievements.length}',
-              style: theme.textTheme.bodySmall,
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            childAspectRatio: 0.9,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
           ),
-          itemCount: achievements.length,
-          itemBuilder: (context, index) {
-            final achievement = achievements[index];
-            return _AchievementCard(
-              achievement: achievement,
-              onTap: achievement.unlocked
-                  ? () => showAchievementUnlockDialog(context, achievement)
-                  : null,
-            );
-          },
-        ),
-        const SizedBox(height: 24),
-      ],
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(
+                  child: Text(
+                    _categoryEmoji(category),
+                    style: const TextStyle(fontSize: 18),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                category,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                  color: Color(0xFF172033),
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '$unlockedCount / ${achievements.length}',
+                style: const TextStyle(color: Color(0xFF6B7280)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 4,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 0.62,
+            ),
+            itemCount: achievements.length,
+            itemBuilder: (context, index) {
+              final achievement = achievements[index];
+              return _AchievementTile(
+                achievement: achievement,
+                accentColor: color,
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _AchievementCard extends StatelessWidget {
-  final Achievement achievement;
-  final VoidCallback? onTap;
+class _AchievementTile extends StatelessWidget {
+  const _AchievementTile({
+    required this.achievement,
+    required this.accentColor,
+  });
 
-  const _AchievementCard({required this.achievement, this.onTap});
+  final Achievement achievement;
+  final Color accentColor;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final isUnlocked = achievement.unlocked;
+    final unlocked = achievement.unlocked;
 
     return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      onTap: unlocked ? () => showAchievementUnlockDialog(context, achievement) : null,
+      borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
         decoration: BoxDecoration(
-          color: isUnlocked
-              ? (isDark
-                  ? AppColors.darkCard
-                  : Colors.white)
-              : (isDark
-                  ? AppColors.darkCard.withValues(alpha: 0.5)
-                  : Colors.grey.shade100),
-          borderRadius: BorderRadius.circular(12),
-          border: isUnlocked
-              ? Border.all(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.3),
-                  width: 1.5,
-                )
-              : null,
-          boxShadow: isUnlocked
-              ? [
-                  BoxShadow(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : null,
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // 图标
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: isUnlocked
-                  ? theme.colorScheme.primary.withValues(alpha: 0.15)
-                  : (isDark
-                      ? Colors.grey.shade800
-                      : Colors.grey.shade200),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                achievement.icon,
-                style: TextStyle(
-                  fontSize: 20,
-                  color: isUnlocked ? null : Colors.grey,
+          color: unlocked ? const Color(0xFFF8FAFC) : const Color(0xFFF3F4F6),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: unlocked ? accentColor.withValues(alpha: 0.22) : const Color(0xFFE5E7EB),
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: unlocked ? accentColor.withValues(alpha: 0.12) : const Color(0xFFE5E7EB),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  achievement.icon,
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: unlocked ? null : Colors.grey,
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 4),
-          // 标题
-          Text(
-            achievement.title,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              fontSize: 10,
-              color: isUnlocked
-                  ? (isDark ? AppColors.darkText : null)
-                  : Colors.grey,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          // 描述
-          Text(
-            achievement.description,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: isUnlocked
-                  ? (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)
-                  : Colors.grey,
-              fontSize: 9,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          // 进度或解锁日期
-          if (isUnlocked)
-            Text(
-              _formatDate(achievement.unlockedAt),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                fontSize: 11,
+            const SizedBox(height: 6),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    achievement.title,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w800,
+                      color: unlocked ? const Color(0xFF172033) : Colors.grey,
+                      height: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    unlocked ? _formatDate(achievement.unlockedAt) : '${(achievement.progress * 100).toStringAsFixed(0)}%',
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 8,
+                      color: unlocked ? accentColor : Colors.grey,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
-            )
-          else
-            _ProgressBar(progress: achievement.progress),
-        ],
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   String _formatDate(DateTime? date) {
-    if (date == null) return '';
+    if (date == null) return '已解锁';
     return '${date.month}/${date.day}';
   }
 }
 
-class _ProgressBar extends StatelessWidget {
-  final double progress;
+String _categoryEmoji(String category) {
+  switch (category) {
+    case '游泳':
+      return '🏊';
+    case '健身':
+      return '💪';
+    case '连续':
+      return '🔥';
+    case '月度':
+      return '📅';
+    case '热量':
+      return '⚡';
+    case '时长':
+      return '⏱️';
+    case '部位':
+      return '🎯';
+    case '全能':
+      return '🏅';
+    default:
+      return '✨';
+  }
+}
 
-  const _ProgressBar({required this.progress});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Column(
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: LinearProgressIndicator(
-            value: progress,
-            backgroundColor: isDark
-                ? Colors.grey.shade800
-                : Colors.grey.shade200,
-            valueColor: AlwaysStoppedAnimation<Color>(
-              theme.colorScheme.primary.withValues(alpha: 0.6),
-            ),
-            minHeight: 4,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          '${(progress * 100).toStringAsFixed(0)}%',
-          style: TextStyle(
-            fontSize: 9,
-            color: isDark ? AppColors.darkTextSecondary : Colors.grey,
-          ),
-        ),
-      ],
-    );
+Color _colorForCategory(String category) {
+  switch (category) {
+    case '游泳':
+      return const Color(0xFF0EA5E9);
+    case '健身':
+      return const Color(0xFF4F46E5);
+    case '连续':
+      return const Color(0xFFEF4444);
+    case '月度':
+      return const Color(0xFF14B8A6);
+    case '热量':
+      return const Color(0xFFF59E0B);
+    case '时长':
+      return const Color(0xFF8B5CF6);
+    case '部位':
+      return const Color(0xFF10B981);
+    case '全能':
+      return const Color(0xFF6366F1);
+    default:
+      return const Color(0xFF64748B);
   }
 }

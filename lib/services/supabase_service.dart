@@ -1,19 +1,54 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../config/supabase_config.dart';
 import '../models/workout_session.dart';
 import '../models/body_metrics.dart';
+
+class SupabaseConfigException implements Exception {
+  final String message;
+
+  const SupabaseConfigException(this.message);
+
+  @override
+  String toString() => message;
+}
 
 class SupabaseService {
   SupabaseService._();
 
   static SupabaseService get instance => _instance;
   static final SupabaseService _instance = SupabaseService._();
+  static bool _isReady = false;
 
-  bool get isInitialized => Supabase.instance.isInitialized;
-  String? get uid => Supabase.instance.client.auth.currentUser?.id;
+  bool get isInitialized => _isReady;
+  String? get uid =>
+      _isReady ? Supabase.instance.client.auth.currentUser?.id : null;
+
+  static bool get hasValidConfig =>
+      _isValidConfigValue(supabaseUrl) && _isValidConfigValue(supabaseAnonKey);
+
+  static bool _isValidConfigValue(String value) {
+    final trimmed = value.trim();
+    return trimmed.isNotEmpty &&
+        !trimmed.contains('your-project.supabase.co') &&
+        trimmed != 'your-anon-key';
+  }
+
+  static Never _throwConfigError() {
+    throw const SupabaseConfigException(
+      'Supabase 还没配置。请把 lib/config/supabase_config.dart 里的 supabaseUrl 和 supabaseAnonKey 换成你自己的项目值。',
+    );
+  }
 
   /// Initialize Supabase (call in main.dart before runApp)
   static Future<void> init(String url, String anonKey) async {
+    if (!_isValidConfigValue(url) || !_isValidConfigValue(anonKey)) {
+      _isReady = false;
+      return;
+    }
     await Supabase.initialize(url: url, anonKey: anonKey);
+    _isReady = true;
   }
 
   SupabaseClient get _db => Supabase.instance.client;
@@ -22,6 +57,7 @@ class SupabaseService {
 
   /// Register with email + password
   static Future<User> register(String email, String password) async {
+    if (!hasValidConfig) _throwConfigError();
     final res = await Supabase.instance.client.auth.signUp(
       email: email,
       password: password,
@@ -32,6 +68,7 @@ class SupabaseService {
 
   /// Login with email + password
   static Future<User> login(String email, String password) async {
+    if (!hasValidConfig) _throwConfigError();
     final res = await Supabase.instance.client.auth.signInWithPassword(
       email: email,
       password: password,
@@ -44,7 +81,10 @@ class SupabaseService {
 
   /// Stream auth state changes
   static Stream<User?> get authStateChanges =>
-      Supabase.instance.client.auth.onAuthStateChange.map((event) => event.session?.user);
+      _isReady
+          ? Supabase.instance.client.auth.onAuthStateChange
+              .map((event) => event.session?.user)
+          : Stream<User?>.value(null);
 
   // ── Profile ──────────────────────────────────────────────
 

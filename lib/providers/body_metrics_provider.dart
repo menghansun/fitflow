@@ -121,41 +121,50 @@ class BodyMetricsProvider extends ChangeNotifier {
 
   /// 获取体重趋势数据（最近 N 条）
   List<MapEntry<DateTime, double>> getWeightTrend(int count) {
-    return _records
-        .reversed
-        .where((r) => r.weight != null)
-        .take(count)
-        .map((r) => MapEntry(r.date, r.weight!))
-        .toList();
+    return _buildTrend(
+      _records.where((r) => r.weight != null).map((r) => MapEntry(r.date, r.weight!)).toList(),
+      count,
+    );
   }
 
   /// 获取 BMI 趋势数据（最近 N 条）
   List<MapEntry<DateTime, double>> getBmiTrend(int count) {
-    return _records
-        .reversed
-        .where((r) => r.bmi != null)
-        .take(count)
-        .map((r) => MapEntry(r.date, r.bmi!))
-        .toList();
+    return _buildTrend(
+      _records.where((r) => r.bmi != null).map((r) => MapEntry(r.date, r.bmi!)).toList(),
+      count,
+    );
   }
 
   /// 获取体脂率趋势数据（最近 N 条）
   List<MapEntry<DateTime, double>> getBodyFatTrend(int count) {
-    return _records
-        .reversed
-        .where((r) => r.bodyFatPercentage != null)
-        .take(count)
-        .map((r) => MapEntry(r.date, r.bodyFatPercentage!))
-        .toList();
+    return _buildTrend(
+      _records
+          .where((r) => r.bodyFatPercentage != null)
+          .map((r) => MapEntry(r.date, r.bodyFatPercentage!))
+          .toList(),
+      count,
+    );
   }
 
   /// 获取肌肉含量趋势数据（最近 N 条）
   List<MapEntry<DateTime, double>> getMuscleMassTrend(int count) {
-    return _records
-        .reversed
-        .where((r) => r.muscleMass != null)
-        .take(count)
-        .map((r) => MapEntry(r.date, r.muscleMass!))
-        .toList();
+    return _buildTrend(
+      _records.where((r) => r.muscleMass != null).map((r) => MapEntry(r.date, r.muscleMass!)).toList(),
+      count,
+    );
+  }
+
+  List<MapEntry<DateTime, double>> _buildTrend(
+    List<MapEntry<DateTime, double>> items,
+    int count,
+  ) {
+    final chronological = items.reversed.toList();
+    if (chronological.length <= count) {
+      return chronological;
+    }
+
+    final first = chronological.first;
+    final recent = chronological.skip(chronological.length - (count - 1)).toList();
+    return [first, ...recent];
   }
 }

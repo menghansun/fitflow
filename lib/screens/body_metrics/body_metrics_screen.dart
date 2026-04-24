@@ -1,8 +1,10 @@
-﻿import 'dart:ui' as ui;
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'dart:ui' as ui;
+
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+
 import '../../models/body_metrics.dart';
 import '../../providers/body_metrics_provider.dart';
 import '../../providers/user_provider.dart';
@@ -17,38 +19,50 @@ class BodyMetricsScreen extends StatefulWidget {
 
 class _BodyMetricsScreenState extends State<BodyMetricsScreen> {
   String _selectedMetric = 'weight';
-  final _dateFormat = DateFormat('MM/dd');
   bool _showFront = true;
+  final DateFormat _axisDateFormat = DateFormat('MM/dd');
+  final DateFormat _historyDateFormat = DateFormat('yyyy/MM/dd');
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
+      backgroundColor: const Color(0xFFF4F7FB),
       appBar: AppBar(
         title: const Text('身体指标'),
-        backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
-        elevation: 0,
+        backgroundColor: const Color(0xFFF4F7FB),
+        centerTitle: true,
       ),
       body: Consumer2<BodyMetricsProvider, UserProvider>(
         builder: (context, provider, userProvider, _) {
           if (provider.records.isEmpty) {
-            return _buildEmptyState(context);
+            return _buildEmptyState();
           }
-          final userHeight = userProvider.currentUser?.height;
+
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildBodyDiagram(provider, userHeight),
-                const SizedBox(height: 24),
-                _buildMetricSelector(),
+                const _SectionHeader(title: '身体概况'),
+                const SizedBox(height: 12),
+                _BodyOverviewCard(
+                  latest: provider.latest!,
+                  userHeight: userProvider.currentUser?.height,
+                  showFront: _showFront,
+                  onToggle: () => setState(() => _showFront = !_showFront),
+                ),
+                const SizedBox(height: 20),
+                const _SectionHeader(title: '指标切换'),
+                const SizedBox(height: 12),
+                _MetricSelector(
+                  selectedMetric: _selectedMetric,
+                  onChanged: (value) => setState(() => _selectedMetric = value),
+                ),
                 const SizedBox(height: 16),
                 _buildChart(provider),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
+                const _SectionHeader(title: '历史记录'),
+                const SizedBox(height: 12),
                 _buildHistoryList(provider),
               ],
             ),
@@ -56,477 +70,569 @@ class _BodyMetricsScreenState extends State<BodyMetricsScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddDialog(context),
+        onPressed: () => _showRecordSheet(context),
         backgroundColor: AppColors.gymAccent,
         child: const Icon(Icons.add),
       ),
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
+  Widget _buildEmptyState() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text('📊', style: TextStyle(fontSize: 64)),
-          const SizedBox(height: 16),
-          Text('还没有测量记录', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Text('点击下方按钮添加第一条记录', style: Theme.of(context).textTheme.bodyMedium),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 92,
+              height: 92,
+              decoration: BoxDecoration(
+                color: AppColors.gymAccent.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Center(
+                child: Text('📊', style: TextStyle(fontSize: 42)),
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              '还没有测量记录',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF172033),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '先添加一条体重、体脂或肌肉记录，页面就会自动生成概览和趋势图。',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Color(0xFF6B7280), height: 1.6),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildBodyDiagram(BodyMetricsProvider provider, double? userHeight) {
-    final latest = provider.latest;
-    if (latest == null) return const SizedBox();
+  Widget _buildChart(BodyMetricsProvider provider) {
+    final chartData = _resolveMetricData(provider);
+    if (chartData.points.isEmpty) {
+      return Container(
+        height: 250,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: const Center(child: Text('暂无数据')),
+      );
+    }
+
+    final values = chartData.points.map((entry) => entry.value).toList();
+    final dataMin = values.reduce((a, b) => a < b ? a : b);
+    final dataMax = values.reduce((a, b) => a > b ? a : b);
+    final yScale = _buildYAxisScale(dataMin, dataMax);
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      height: 260,
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('身体概况', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
           Row(
             children: [
-              // 人体示意图（可点击切换正反面）
-              SizedBox(
-                width: 140,
-                child: Column(
-                  children: [
-                    GestureDetector(
-                      onTap: () => setState(() => _showFront = !_showFront),
-                      child: Image.asset(
-                        _showFront ? 'assets/body_front.jpeg' : 'assets/body_back.jpeg',
-                        width: 140,
-                        height: 200,
-                        fit: BoxFit.contain,
-                        alignment: Alignment.centerLeft,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    // 圆点指示器
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: _showFront ? AppColors.gymAccent : Colors.grey[300],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: !_showFront ? AppColors.gymAccent : Colors.grey[300],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _showFront ? '正面' : '背面',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                    ),
-                  ],
+              Text(
+                chartData.label,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF172033),
                 ),
               ),
-              // 右侧指标列表
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildBodyMetricRow('体重', latest.weight != null ? '${latest.weight!.toStringAsFixed(1)} kg' : '--', AppColors.gymAccent),
-                    const SizedBox(height: 8),
-                    if (userHeight != null) ...[
-                      _buildBodyMetricRow('身高', '${userHeight.toStringAsFixed(1)} cm', Colors.teal),
-                      const SizedBox(height: 8),
-                    ],
-                    _buildBodyMetricRow('BMI', latest.bmi != null ? latest.bmi!.toStringAsFixed(1) : '--', Colors.blue),
-                    const SizedBox(height: 8),
-                    _buildBodyMetricRow('体脂率', latest.bodyFatPercentage != null ? '${latest.bodyFatPercentage!.toStringAsFixed(1)}%' : '--', Colors.orange),
-                    const SizedBox(height: 8),
-                    _buildBodyMetricRow('肌肉量', latest.muscleMass != null ? '${latest.muscleMass!.toStringAsFixed(1)} kg' : '--', Colors.green),
-                    if (latest.basalMetabolicRate != null) ...[
-                      const SizedBox(height: 8),
-                      _buildBodyMetricRow('基础代谢', '${latest.basalMetabolicRate} kcal', Colors.purple),
-                    ],
-                    if (latest.notes != null && latest.notes!.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          latest.notes!,
-                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+              const Spacer(),
+              Text(
+                '${chartData.points.length} 条记录',
+                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBodyMetricRow(String label, String value, Color color) {
-    return Row(
-      children: [
-        Container(
-          width: 4,
-          height: 16,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(label, style: const TextStyle(fontSize: 13)),
-        ),
-        Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-      ],
-    );
-  }
-
-  Widget _buildMetricSelector() {
-    final metrics = [
-      ('weight', '体重'),
-      ('bmi', 'BMI'),
-      ('bodyFat', '体脂率'),
-      ('muscle', '肌肉'),
-    ];
-
-    return Row(
-      children: metrics.map((m) {
-        final selected = _selectedMetric == m.$1;
-        return Expanded(
-          child: GestureDetector(
-            onTap: () => setState(() => _selectedMetric = m.$1),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              decoration: BoxDecoration(
-                color: selected ? AppColors.gymAccent : Colors.grey[200],
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                m.$2,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: selected ? Colors.white : Colors.grey[700],
-                  fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                ),
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildChart(BodyMetricsProvider provider) {
-    List<MapEntry<DateTime, double>> data;
-    String unit;
-    Color lineColor = AppColors.gymAccent;
-    const maxDisplayCount = 5;
-
-    switch (_selectedMetric) {
-      case 'weight':
-        data = provider.getWeightTrend(maxDisplayCount);
-        unit = 'kg';
-        break;
-      case 'bmi':
-        data = provider.getBmiTrend(maxDisplayCount);
-        unit = '';
-        lineColor = Colors.blue;
-        break;
-      case 'bodyFat':
-        data = provider.getBodyFatTrend(maxDisplayCount);
-        unit = '%';
-        lineColor = Colors.orange;
-        break;
-      case 'muscle':
-        data = provider.getMuscleMassTrend(maxDisplayCount);
-        unit = 'kg';
-        lineColor = Colors.green;
-        break;
-      default:
-        data = [];
-        unit = '';
-    }
-
-    if (data.isEmpty) {
-      return Container(
-        height: 200,
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: const Center(child: Text('暂无数据')),
-      );
-    }
-
-    final dataMin = data.map((e) => e.value).reduce((a, b) => a < b ? a : b);
-    final dataMax = data.map((e) => e.value).reduce((a, b) => a > b ? a : b);
-    final dataRange = (dataMax - dataMin).abs();
-    final rawInterval = dataRange == 0 ? 1.0 : dataRange / 3;
-    double yInterval;
-    if (rawInterval <= 0.5) {
-      yInterval = 0.5;
-    } else if (rawInterval <= 1) {
-      yInterval = 1;
-    } else if (rawInterval <= 2) {
-      yInterval = 2;
-    } else if (rawInterval <= 5) {
-      yInterval = 5;
-    } else if (rawInterval <= 10) {
-      yInterval = 10;
-    } else {
-      yInterval = (rawInterval / 10).ceilToDouble() * 10;
-    }
-    final minY = (dataMin / yInterval).floor() * yInterval;
-    final maxY = (dataMax / yInterval).ceil() * yInterval;
-    final minX = data.length == 1 ? -0.5 : 0.0;
-    final maxX = data.length == 1 ? 0.5 : (data.length - 1).toDouble();
-    final spots = data.asMap().entries
-        .map((e) => FlSpot(e.key.toDouble(), e.value.value))
-        .toList();
-
-    return Container(
-      height: 200,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final chartSize = Size(constraints.maxWidth, constraints.maxHeight);
-          final axisTextStyle = TextStyle(fontSize: 10, color: Colors.grey[600]);
-          final textDirection = Directionality.of(context);
-          final yLabels = <String>[
-            for (double value = minY; value <= maxY + 0.001; value += yInterval)
-              '${value.toStringAsFixed(1)}$unit',
-          ];
-          final maxYLabelWidth = yLabels
-              .map((label) {
-                final painter = TextPainter(
-                  text: TextSpan(text: label, style: axisTextStyle),
-                  maxLines: 1,
-                  textDirection: textDirection,
-                )..layout();
-                return painter.width;
-              })
-              .fold<double>(0, (maxWidth, width) => width > maxWidth ? width : maxWidth);
-          final datePainter = TextPainter(
-            text: TextSpan(text: _dateFormat.format(data.first.key), style: axisTextStyle),
-            maxLines: 1,
-            textDirection: textDirection,
-          )..layout();
-          const leftInset = 30.0;
-          const topInset = 24.0;
-          final rightAxis = maxYLabelWidth + 14;
-          final bottomAxis = datePainter.height + 14;
-          return Transform.translate(
-            offset: const Offset(10, 10),
-            child: SizedBox(
-              width: chartSize.width,
-              height: chartSize.height,
+          const SizedBox(height: 16),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(right: 0),
               child: LineChart(
                 LineChartData(
+                  minX: 0,
+                  maxX: (chartData.points.length - 1).toDouble(),
+                  minY: yScale.minY,
+                  maxY: yScale.maxY,
+                  borderData: FlBorderData(show: false),
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: false,
-                    horizontalInterval: yInterval,
-                    getDrawingHorizontalLine: (value) => FlLine(
-                      color: Colors.grey[200]!,
+                    horizontalInterval: yScale.interval,
+                    getDrawingHorizontalLine: (_) => FlLine(
+                      color: const Color(0xFFE5E7EB),
                       strokeWidth: 1,
                     ),
                   ),
                   titlesData: FlTitlesData(
                     leftTitles: const AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: false,
-                        reservedSize: leftInset,
-                      ),
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
                     ),
                     rightTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
-                        reservedSize: rightAxis,
-                        interval: yInterval,
-                        getTitlesWidget: (value, meta) {
-                          return Transform.translate(
-                            offset: const Offset(10, 0),
-                            child: Text(
-                              '${value.toStringAsFixed(1)}$unit',
-                              style: axisTextStyle,
+                        reservedSize: 46,
+                        interval: yScale.interval,
+                        getTitlesWidget: (value, _) {
+                          if (!yScale.shouldShow(value)) {
+                            return const SizedBox.shrink();
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(left: 2),
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                chartData.formatValue(value),
+                                textAlign: TextAlign.right,
+                                style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+                              ),
                             ),
                           );
                         },
                       ),
                     ),
-                    topTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: false,
-                        reservedSize: topInset,
-                      ),
-                    ),
                     bottomTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
-                        reservedSize: bottomAxis,
+                        reservedSize: 28,
                         interval: 1,
-                        getTitlesWidget: (value, meta) {
+                        getTitlesWidget: (value, _) {
                           final index = value.toInt();
-                          if (index >= 0 && index < data.length) {
-                            final date = data[index].key;
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Text(
-                                _dateFormat.format(date),
-                                style: axisTextStyle,
-                              ),
-                            );
+                          if (index < 0 || index >= chartData.points.length) {
+                            return const SizedBox.shrink();
                           }
-                          return const SizedBox();
+                          final isLast = index == chartData.points.length - 1;
+                          return Padding(
+                            padding: EdgeInsets.only(top: 8, right: isLast ? 2 : 0),
+                            child: Text(
+                              _axisDateFormat.format(chartData.points[index].key),
+                              style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+                            ),
+                          );
                         },
                       ),
                     ),
                   ),
-                  borderData: FlBorderData(show: false),
-                  minX: minX,
-                  maxX: maxX,
-                  minY: minY,
-                  maxY: maxY,
+                  lineTouchData: const LineTouchData(enabled: false),
                   lineBarsData: [
                     LineChartBarData(
-                      spots: spots,
-                      isCurved: false,
-                      color: lineColor,
-                      barWidth: 2,
+                      spots: chartData.points
+                          .asMap()
+                          .entries
+                          .map((entry) => FlSpot(entry.key.toDouble(), entry.value.value))
+                          .toList(),
+                      isCurved: true,
+                      curveSmoothness: 0.26,
+                      color: chartData.color,
+                      barWidth: 3,
+                      isStrokeCapRound: true,
                       dotData: FlDotData(
                         show: true,
-                        getDotPainter: (spot, percent, barData, index) {
-                          return _MetricDotPainter(
-                            label: data[index].value.toStringAsFixed(1),
-                            color: lineColor,
-                          );
-                        },
+                        getDotPainter: (spot, _, __, index) => _MetricDotPainter(
+                          label: chartData.points[index].value.toStringAsFixed(1),
+                          color: chartData.color,
+                          shiftLeft: index == chartData.points.length - 1,
+                        ),
                       ),
                       belowBarData: BarAreaData(
                         show: true,
-                        color: lineColor.withValues(alpha: 0.1),
+                        gradient: LinearGradient(
+                          colors: [
+                            chartData.color.withValues(alpha: 0.2),
+                            chartData.color.withValues(alpha: 0.02),
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
                       ),
                     ),
                   ],
-                  lineTouchData: const LineTouchData(enabled: false),
                 ),
               ),
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }
+
+  _YAxisScale _buildYAxisScale(double dataMin, double dataMax) {
+    final range = (dataMax - dataMin).abs();
+    double interval;
+    if (range <= 1.5) {
+      interval = 0.5;
+    } else if (range <= 4) {
+      interval = 1.0;
+    } else if (range <= 8) {
+      interval = 2.0;
+    } else {
+      interval = (range / 3).ceilToDouble();
+    }
+
+    final minY = (dataMin / interval).floor() * interval;
+    var maxY = (dataMax / interval).ceil() * interval;
+    if ((maxY - minY) / interval < 3) {
+      maxY += interval;
+    }
+
+    return _YAxisScale(
+      minY: minY,
+      maxY: maxY,
+      interval: interval,
+    );
+  }
+
+  _MetricChartData _resolveMetricData(BodyMetricsProvider provider) {
+    switch (_selectedMetric) {
+      case 'bmi':
+        return _MetricChartData(
+          label: 'BMI 趋势',
+          color: const Color(0xFF3B82F6),
+          unit: '',
+          points: provider.getBmiTrend(5),
+        );
+      case 'bodyFat':
+        return _MetricChartData(
+          label: '体脂率趋势',
+          color: const Color(0xFFF59E0B),
+          unit: '%',
+          points: provider.getBodyFatTrend(5),
+        );
+      case 'muscle':
+        return _MetricChartData(
+          label: '肌肉量趋势',
+          color: const Color(0xFF10B981),
+          unit: 'kg',
+          points: provider.getMuscleMassTrend(5),
+        );
+      case 'weight':
+      default:
+        return _MetricChartData(
+          label: '体重趋势',
+          color: AppColors.gymAccent,
+          unit: 'kg',
+          points: provider.getWeightTrend(5),
+        );
+    }
+  }
+
   Widget _buildHistoryList(BodyMetricsProvider provider) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('历史记录', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: provider.records.length,
-          itemBuilder: (context, index) => _buildHistoryItem(provider.records[index]),
-        ),
-      ],
+      children: provider.records
+          .map(
+            (record) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _HistoryRecordCard(
+                date: _historyDateFormat.format(record.date),
+                metrics: _recordMetricItems(record),
+                note: _recordNote(record),
+                onEdit: () => _showRecordSheet(context, record: record),
+                onDelete: () => _confirmDelete(record),
+              ),
+            ),
+          )
+          .toList(),
     );
   }
 
-  Widget _buildHistoryItem(BodyMetrics record) {
-    final dateFormat = DateFormat('yyyy/MM/dd');
+  List<String> _recordMetricItems(BodyMetrics record) {
+    final items = <String>[];
+    if (record.weight != null) items.add('体重 ${record.weight!.toStringAsFixed(1)}kg');
+    if (record.bmi != null) items.add('BMI ${record.bmi!.toStringAsFixed(1)}');
+    if (record.bodyFatPercentage != null) items.add('体脂 ${record.bodyFatPercentage!.toStringAsFixed(1)}%');
+    if (record.muscleMass != null) items.add('肌肉 ${record.muscleMass!.toStringAsFixed(1)}kg');
+    if (record.basalMetabolicRate != null) items.add('基础代谢 ${record.basalMetabolicRate}kcal');
+    return items;
+  }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha:0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+  String? _recordNote(BodyMetrics record) {
+    final note = record.notes?.trim();
+    if (note == null || note.isEmpty) return null;
+    return note;
+  }
+
+  Future<void> _confirmDelete(BodyMetrics record) async {
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('删除记录'),
+            content: const Text('确定要删除这条测量记录吗？'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('取消'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text('删除', style: TextStyle(color: Colors.red.shade400)),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  dateFormat.format(record.date),
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 4),
-                Wrap(
-                  spacing: 12,
-                  children: [
-                    if (record.weight != null) Text('体重: ${record.weight}kg', style: TextStyle(fontSize: 13, color: Colors.grey[600])),
-                    if (record.bmi != null) Text('BMI: ${record.bmi!.toStringAsFixed(1)}', style: TextStyle(fontSize: 13, color: Colors.grey[600])),
-                    if (record.bodyFatPercentage != null) Text('体脂: ${record.bodyFatPercentage}%', style: TextStyle(fontSize: 13, color: Colors.grey[600])),
-                    if (record.muscleMass != null) Text('肌肉: ${record.muscleMass}kg', style: TextStyle(fontSize: 13, color: Colors.grey[600])),
-                    if (record.basalMetabolicRate != null) Text('基础代谢: ${record.basalMetabolicRate}kcal', style: TextStyle(fontSize: 13, color: Colors.grey[600])),
-                  ],
-                ),
-              ],
-            ),
+        ) ??
+        false;
+
+    if (confirmed && mounted) {
+      context.read<BodyMetricsProvider>().deleteRecord(record.id);
+    }
+  }
+
+  Future<void> _showRecordSheet(BuildContext context, {BodyMetrics? record}) async {
+    final provider = context.read<BodyMetricsProvider>();
+    var selectedDate = record?.date ?? DateTime.now();
+    var isSaving = false;
+
+    double? weight = record?.weight;
+    double? bodyFat = record?.bodyFatPercentage;
+    double? muscle = record?.muscleMass;
+    int? bmr = record?.basalMetabolicRate;
+
+    final weightCtrl = TextEditingController(text: record?.weight?.toString() ?? '');
+    final bodyFatCtrl = TextEditingController(text: record?.bodyFatPercentage?.toString() ?? '');
+    final muscleCtrl = TextEditingController(text: record?.muscleMass?.toString() ?? '');
+    final bmrCtrl = TextEditingController(text: record?.basalMetabolicRate?.toString() ?? '');
+    final notesCtrl = TextEditingController(text: record?.notes ?? '');
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.9,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD1D5DB),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            record == null ? '添加测量记录' : '编辑测量记录',
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF172033),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          InkWell(
+                            onTap: () async {
+                              final picked = await _showStyledDatePicker(sheetContext, initialDate: selectedDate);
+                              if (picked != null) {
+                                setSheetState(() => selectedDate = picked);
+                              }
+                            },
+                            borderRadius: BorderRadius.circular(18),
+                            child: Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(color: const Color(0xFFE5E7EB)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.calendar_today_outlined, size: 18),
+                                  const SizedBox(width: 8),
+                                  Text(DateFormat('yyyy/MM/dd').format(selectedDate)),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          _buildInputField(
+                            label: '体重 (kg)',
+                            controller: weightCtrl,
+                            onChanged: (value) => weight = double.tryParse(value),
+                          ),
+                          _buildInputField(
+                            label: '体脂率 (%)',
+                            controller: bodyFatCtrl,
+                            onChanged: (value) => bodyFat = double.tryParse(value),
+                          ),
+                          _buildInputField(
+                            label: '肌肉含量 (kg)',
+                            controller: muscleCtrl,
+                            onChanged: (value) => muscle = double.tryParse(value),
+                          ),
+                          _buildInputField(
+                            label: '基础代谢 (kcal)',
+                            controller: bmrCtrl,
+                            keyboardType: TextInputType.number,
+                            onChanged: (value) => bmr = int.tryParse(value.replaceAll(RegExp(r'[^\d]'), '')),
+                          ),
+                          const SizedBox(height: 4),
+                          TextField(
+                            controller: notesCtrl,
+                            maxLines: 3,
+                            decoration: InputDecoration(
+                              labelText: '备注',
+                              filled: true,
+                              fillColor: const Color(0xFFF8FAFC),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(18),
+                                borderSide: BorderSide.none,
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(18),
+                                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: isSaving
+                                  ? null
+                                  : () async {
+                                      if (weight == null && bodyFat == null && muscle == null && bmr == null) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('请至少填写一项指标')),
+                                        );
+                                        return;
+                                      }
+
+                                      setSheetState(() => isSaving = true);
+                                      final normalizedDate = DateTime(
+                                        selectedDate.year,
+                                        selectedDate.month,
+                                        selectedDate.day,
+                                      );
+
+                                      if (record == null) {
+                                        final created = BodyMetrics(
+                                          id: provider.generateId(),
+                                          date: normalizedDate,
+                                          weight: weight,
+                                          height: context.read<UserProvider>().currentUser?.height,
+                                          bodyFatPercentage: bodyFat,
+                                          muscleMass: muscle,
+                                          basalMetabolicRate: bmr,
+                                          notes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
+                                        );
+                                        await provider.addRecord(created);
+                                      } else {
+                                        final updated = record.copyWith(
+                                          date: normalizedDate,
+                                          weight: weight,
+                                          bodyFatPercentage: bodyFat,
+                                          muscleMass: muscle,
+                                          basalMetabolicRate: bmr,
+                                          notes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
+                                        );
+                                        await provider.updateRecord(updated);
+                                      }
+
+                                      if (mounted) {
+                                        Navigator.pop(sheetContext);
+                                      }
+                                    },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.gymAccent,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                              ),
+                              child: Text(
+                                isSaving ? '保存中...' : '保存',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildInputField({
+    required String label,
+    required TextEditingController controller,
+    required ValueChanged<String> onChanged,
+    TextInputType keyboardType = const TextInputType.numberWithOptions(decimal: true),
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: TextField(
+        controller: controller,
+        keyboardType: keyboardType,
+        onChanged: onChanged,
+        decoration: InputDecoration(
+          labelText: label,
+          filled: true,
+          fillColor: const Color(0xFFF8FAFC),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide.none,
           ),
-          IconButton(
-            icon: Icon(Icons.edit_outlined, color: Colors.blue[300]),
-            onPressed: () => _showEditDialog(context, record),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
           ),
-          IconButton(
-            icon: Icon(Icons.delete_outline, color: Colors.red[300]),
-            onPressed: () => _confirmDelete(record),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -535,15 +641,6 @@ class _BodyMetricsScreenState extends State<BodyMetricsScreen> {
     BuildContext context, {
     required DateTime initialDate,
   }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primary = AppColors.gymAccent;
-    final onPrimary = Colors.white;
-    final surface = isDark ? AppColors.darkSurface : Colors.white;
-    final onSurface = isDark ? AppColors.lightText : AppColors.darkText;
-    final muted = (theme.textTheme.bodyMedium?.color ?? onSurface)
-        .withValues(alpha: 0.65);
-
     return showDatePicker(
       context: context,
       initialDate: initialDate,
@@ -554,393 +651,467 @@ class _BodyMetricsScreenState extends State<BodyMetricsScreen> {
       cancelText: '取消',
       confirmText: '确定',
       builder: (context, child) {
-        final styledTheme = theme.copyWith(
-          colorScheme: theme.colorScheme.copyWith(
-            primary: primary,
-            onPrimary: onPrimary,
-            surface: surface,
-            onSurface: onSurface,
-          ),
-          dialogTheme: DialogThemeData(
-            backgroundColor: surface,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(28),
-            ),
-          ),
-          datePickerTheme: DatePickerThemeData(
-            backgroundColor: surface,
-            surfaceTintColor: Colors.transparent,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(28),
-            ),
-            headerBackgroundColor: surface,
-            headerForegroundColor: onSurface,
-            headerHeadlineStyle: const TextStyle(
-              fontSize: 0,
-              height: 0,
-              color: Colors.transparent,
-            ),
-            headerHelpStyle: theme.textTheme.titleMedium?.copyWith(
-              color: onSurface,
-              fontWeight: FontWeight.w700,
-            ),
-            weekdayStyle: theme.textTheme.bodyMedium?.copyWith(
-              color: onSurface.withValues(alpha: 0.72),
-              fontWeight: FontWeight.w700,
-            ),
-            dayStyle: theme.textTheme.titleMedium?.copyWith(
-              color: onSurface,
-              fontWeight: FontWeight.w600,
-            ),
-            yearStyle: theme.textTheme.titleMedium?.copyWith(
-              color: onSurface,
-              fontWeight: FontWeight.w600,
-            ),
-            todayForegroundColor: MaterialStatePropertyAll(primary),
-            todayBorder: BorderSide(color: primary, width: 1.5),
-            dayForegroundColor: MaterialStateProperty.resolveWith((states) {
-              if (states.contains(MaterialState.selected)) return onPrimary;
-              if (states.contains(MaterialState.disabled)) {
-                return muted.withValues(alpha: 0.5);
-              }
-              return onSurface;
-            }),
-            dayBackgroundColor: MaterialStateProperty.resolveWith((states) {
-              if (states.contains(MaterialState.selected)) return primary;
-              return Colors.transparent;
-            }),
-            yearForegroundColor: MaterialStateProperty.resolveWith((states) {
-              if (states.contains(MaterialState.selected)) return onPrimary;
-              return onSurface;
-            }),
-            yearBackgroundColor: MaterialStateProperty.resolveWith((states) {
-              if (states.contains(MaterialState.selected)) return primary;
-              return primary.withValues(alpha: 0.08);
-            }),
-            cancelButtonStyle: TextButton.styleFrom(
-              foregroundColor: muted,
-              textStyle: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            confirmButtonStyle: TextButton.styleFrom(
-              foregroundColor: primary,
-              textStyle: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-          ),
-        );
-
         return Theme(
-          data: styledTheme,
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+                  primary: AppColors.gymAccent,
+                  onPrimary: Colors.white,
+                  surface: Colors.white,
+                ),
+            datePickerTheme: DatePickerThemeData(
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(28),
+              ),
+            ),
+          ),
           child: child ?? const SizedBox.shrink(),
         );
       },
     );
   }
+}
 
-  void _confirmDelete(BodyMetrics record) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('删除记录'),
-        content: const Text('确定要删除这条测量记录吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 20,
+        fontWeight: FontWeight.w800,
+        color: Color(0xFF172033),
+      ),
+    );
+  }
+}
+
+class _BodyOverviewCard extends StatelessWidget {
+  const _BodyOverviewCard({
+    required this.latest,
+    required this.userHeight,
+    required this.showFront,
+    required this.onToggle,
+  });
+
+  final BodyMetrics latest;
+  final double? userHeight;
+  final bool showFront;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final stats = <_OverviewStat>[
+      _OverviewStat(
+        label: '体重',
+        value: latest.weight != null ? '${latest.weight!.toStringAsFixed(1)}kg' : '--',
+        delta: latest.weight != null ? '已记录' : '待补充',
+        color: const Color(0xFF0EA5E9),
+      ),
+      if (userHeight != null)
+        _OverviewStat(
+          label: '身高',
+          value: '${userHeight!.toStringAsFixed(1)}cm',
+          delta: '已记录',
+          color: const Color(0xFF14B8A6),
+        ),
+      _OverviewStat(
+        label: 'BMI',
+        value: latest.bmi != null ? latest.bmi!.toStringAsFixed(1) : '--',
+        delta: latest.bmiCategory ?? '待补充',
+        color: const Color(0xFF8B5CF6),
+      ),
+      _OverviewStat(
+        label: '体脂率',
+        value: latest.bodyFatPercentage != null ? '${latest.bodyFatPercentage!.toStringAsFixed(1)}%' : '--',
+        delta: latest.bodyFatPercentage != null ? '已记录' : '待补充',
+        color: const Color(0xFFF59E0B),
+      ),
+      _OverviewStat(
+        label: '肌肉量',
+        value: latest.muscleMass != null ? '${latest.muscleMass!.toStringAsFixed(1)}kg' : '--',
+        delta: latest.muscleMass != null ? '已记录' : '待补充',
+        color: const Color(0xFF10B981),
+      ),
+      if (latest.basalMetabolicRate != null)
+        _OverviewStat(
+          label: '基础代谢',
+          value: '${latest.basalMetabolicRate} kcal',
+          delta: '',
+          color: const Color(0xFFA21CAF),
+        ),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              context.read<BodyMetricsProvider>().deleteRecord(record.id);
-            },
-            child: Text('删除', style: TextStyle(color: Colors.red[400])),
+        ],
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              flex: 4,
+              child: Column(
+                children: [
+                  GestureDetector(
+                    onTap: onToggle,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Image.asset(
+                        showFront ? 'assets/body_front.jpeg' : 'assets/body_back.jpeg',
+                        height: 200,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _TinyDot(active: showFront),
+                      const SizedBox(width: 8),
+                      _TinyDot(active: !showFront),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    showFront ? '正面' : '背面',
+                    style: const TextStyle(color: Color(0xFF94A3B8)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              flex: 6,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var i = 0; i < stats.length; i++) ...[
+                      _MetricStatRow(stat: stats[i]),
+                      if (i != stats.length - 1) const SizedBox(height: 16),
+                    ],
+                    if (latest.notes != null && latest.notes!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          latest.notes!.trim(),
+                          style: const TextStyle(color: Color(0xFF6B7280), height: 1.5),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OverviewStat {
+  const _OverviewStat({
+    required this.label,
+    required this.value,
+    required this.delta,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final String delta;
+  final Color color;
+}
+
+class _MetricStatRow extends StatelessWidget {
+  const _MetricStatRow({required this.stat});
+
+  final _OverviewStat stat;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Text(
+            stat.label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF7483B0),
+              letterSpacing: 0.2,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          stat.value,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF6F80B5),
+            letterSpacing: 0.1,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TinyDot extends StatelessWidget {
+  const _TinyDot({required this.active});
+
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 7,
+      height: 7,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: active ? AppColors.gymAccent : const Color(0xFFD1D5DB),
+      ),
+    );
+  }
+}
+
+class _MetricSelector extends StatelessWidget {
+  const _MetricSelector({
+    required this.selectedMetric,
+    required this.onChanged,
+  });
+
+  final String selectedMetric;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final metrics = const [
+      ('weight', '体重'),
+      ('bmi', 'BMI'),
+      ('bodyFat', '体脂率'),
+      ('muscle', '肌肉'),
+    ];
+
+    return Row(
+      children: [
+        for (var i = 0; i < metrics.length; i++) ...[
+          Expanded(
+            child: _MetricChip(
+              label: metrics[i].$2,
+              selected: selectedMetric == metrics[i].$1,
+              onTap: () => onChanged(metrics[i].$1),
+            ),
+          ),
+          if (i != metrics.length - 1) const SizedBox(width: 8),
+        ],
+      ],
+    );
+  }
+}
+
+class _MetricChip extends StatelessWidget {
+  const _MetricChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.gymAccent : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? AppColors.gymAccent : const Color(0xFFE5E7EB),
+          ),
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: selected ? Colors.white : const Color(0xFF6B7280),
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HistoryRecordCard extends StatelessWidget {
+  const _HistoryRecordCard({
+    required this.date,
+    required this.metrics,
+    required this.note,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final String date;
+  final List<String> metrics;
+  final String? note;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 56),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  date,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF172033),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 8,
+                  children: metrics
+                      .map(
+                        (value) => Text(
+                          value,
+                          style: const TextStyle(
+                            color: Color(0xFF6B7280),
+                            fontSize: 13,
+                            height: 1.3,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+                if (note != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    note!,
+                    style: const TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          Positioned(
+            top: 0,
+            right: 0,
+            child: Column(
+              children: [
+                IconButton(
+                  onPressed: onEdit,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+                  icon: Icon(Icons.edit_outlined, color: Colors.blue.shade300),
+                ),
+                const SizedBox(height: 8),
+                IconButton(
+                  onPressed: onDelete,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+                  icon: Icon(Icons.delete_outline, color: Colors.red.shade300),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
+}
 
-  void _showAddDialog(BuildContext context) {
-    final provider = context.read<BodyMetricsProvider>();
-    DateTime selectedDate = DateTime.now();
-    bool isSaving = false;
+class _MetricChartData {
+  const _MetricChartData({
+    required this.label,
+    required this.color,
+    required this.unit,
+    required this.points,
+  });
 
-    double? weight;
-    double? bodyFat;
-    double? muscle;
-    int? bmr;
-    final notesCtrl = TextEditingController();
-    final weightCtrl = TextEditingController();
-    final bodyFatCtrl = TextEditingController();
-    final muscleCtrl = TextEditingController();
-    final bmrCtrl = TextEditingController();
+  final String label;
+  final Color color;
+  final String unit;
+  final List<MapEntry<DateTime, double>> points;
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) => Container(
-          height: MediaQuery.of(context).size.height * 0.9,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-              Container(width: 36, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('添加测量记录', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 20),
-                      // 日期选择
-                      GestureDetector(
-                        onTap: () async {
-                          final date = await _showStyledDatePicker(
-                            ctx,
-                            initialDate: selectedDate,
-                          );
-                          if (date != null) {
-                            setState(() => selectedDate = date);
-                          }
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey[300]!),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.calendar_today, size: 18),
-                              const SizedBox(width: 8),
-                              Text('${selectedDate.year}/${selectedDate.month.toString().padLeft(2, '0')}/${selectedDate.day.toString().padLeft(2, '0')}'),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildInputField('体重 (kg)', weightCtrl, (v) => weight = double.tryParse(v)),
-                      _buildInputField('体脂率 (%)', bodyFatCtrl, (v) => bodyFat = double.tryParse(v)),
-                      _buildInputField('肌肉含量 (kg)', muscleCtrl, (v) => muscle = double.tryParse(v)),
-                      _buildBmrInputField(bmrCtrl, (v) => bmr = int.tryParse(v.replaceAll(RegExp(r'[^\d]'), ''))),
-                      const SizedBox(height: 20),
-                      TextField(
-                        controller: notesCtrl,
-                        decoration: InputDecoration(
-                          labelText: '备注',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: isSaving
-                              ? null
-                              : () async {
-                                  if (weight == null && bodyFat == null && muscle == null && bmr == null) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('请至少填写一项指标')),
-                                    );
-                                    return;
-                                  }
-                                  setState(() => isSaving = true);
-                                  final dateTime = DateTime(
-                                    selectedDate.year,
-                                    selectedDate.month,
-                                    selectedDate.day,
-                                  );
-                                  final record = BodyMetrics(
-                                    id: provider.generateId(),
-                                    date: dateTime,
-                                    weight: weight,
-                                    height: ctx.read<UserProvider>().currentUser?.height,
-                                    bodyFatPercentage: bodyFat,
-                                    muscleMass: muscle,
-                                    basalMetabolicRate: bmr,
-                                    notes: notesCtrl.text.isEmpty ? null : notesCtrl.text,
-                                  );
-                                  provider.addRecord(record);
-                                  Navigator.pop(ctx);
-                                },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: isSaving ? Colors.grey : AppColors.gymAccent,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: Text(isSaving ? '保存中...' : '保存', style: const TextStyle(color: Colors.white, fontSize: 16)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  String formatValue(double value) {
+    return '${value.toStringAsFixed(1)}$unit';
   }
+}
 
-  void _showEditDialog(BuildContext context, BodyMetrics record) {
-    final provider = context.read<BodyMetricsProvider>();
-    DateTime selectedDate = record.date;
-    bool isSaving = false;
+class _YAxisScale {
+  const _YAxisScale({
+    required this.minY,
+    required this.maxY,
+    required this.interval,
+  });
 
-    double? weight = record.weight;
-    double? bodyFat = record.bodyFatPercentage;
-    double? muscle = record.muscleMass;
-    int? bmr = record.basalMetabolicRate;
-    final notesCtrl = TextEditingController(text: record.notes ?? '');
-    final weightCtrl = TextEditingController(text: record.weight?.toString() ?? '');
-    final bodyFatCtrl = TextEditingController(text: record.bodyFatPercentage?.toString() ?? '');
-    final muscleCtrl = TextEditingController(text: record.muscleMass?.toString() ?? '');
-    final bmrCtrl = TextEditingController(text: record.basalMetabolicRate?.toString() ?? '');
+  final double minY;
+  final double maxY;
+  final double interval;
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) => Container(
-          height: MediaQuery.of(context).size.height * 0.9,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-              Container(width: 36, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('编辑测量记录', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 20),
-                      // 日期选择
-                      GestureDetector(
-                        onTap: () async {
-                          final date = await _showStyledDatePicker(
-                            ctx,
-                            initialDate: selectedDate,
-                          );
-                          if (date != null) {
-                            setState(() => selectedDate = date);
-                          }
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey[300]!),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.calendar_today, size: 18),
-                              const SizedBox(width: 8),
-                              Text('${selectedDate.year}/${selectedDate.month.toString().padLeft(2, '0')}/${selectedDate.day.toString().padLeft(2, '0')}'),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildInputField('体重 (kg)', weightCtrl, (v) => weight = double.tryParse(v)),
-                      _buildInputField('体脂率 (%)', bodyFatCtrl, (v) => bodyFat = double.tryParse(v)),
-                      _buildInputField('肌肉含量 (kg)', muscleCtrl, (v) => muscle = double.tryParse(v)),
-                      _buildBmrInputField(bmrCtrl, (v) => bmr = int.tryParse(v.replaceAll(RegExp(r'[^\d]'), ''))),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: notesCtrl,
-                        decoration: InputDecoration(
-                          labelText: '备注',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: isSaving
-                              ? null
-                              : () async {
-                                  if (weight == null && bodyFat == null && muscle == null && bmr == null) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('请至少填写一项指标')),
-                                    );
-                                    return;
-                                  }
-                                  setState(() => isSaving = true);
-                                  final dateTime = DateTime(
-                                    selectedDate.year,
-                                    selectedDate.month,
-                                    selectedDate.day,
-                                  );
-                                  final updated = record.copyWith(
-                                    date: dateTime,
-                                    weight: weight,
-                                    bodyFatPercentage: bodyFat,
-                                    muscleMass: muscle,
-                                    basalMetabolicRate: bmr,
-                                    notes: notesCtrl.text.isEmpty ? null : notesCtrl.text,
-                                  );
-                                  provider.updateRecord(updated);
-                                  Navigator.pop(ctx);
-                                },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: isSaving ? Colors.grey : AppColors.gymAccent,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: Text(isSaving ? '保存中...' : '保存', style: const TextStyle(color: Colors.white, fontSize: 16)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInputField(String label, TextEditingController controller, Function(String) onChanged) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: TextField(
-        controller: controller,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        decoration: InputDecoration(
-          labelText: label,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        onChanged: onChanged,
-      ),
-    );
-  }
-
-  Widget _buildBmrInputField(TextEditingController controller, Function(String) onChanged) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: TextField(
-        controller: controller,
-        keyboardType: TextInputType.number,
-        decoration: InputDecoration(
-          labelText: '基础代谢 (kcal)',
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        onChanged: onChanged,
-      ),
-    );
+  bool shouldShow(double value) {
+    const epsilon = 0.001;
+    if (value < minY - epsilon || value > maxY + epsilon) return false;
+    final offset = (value - minY) / interval;
+    return (offset - offset.round()).abs() < epsilon;
   }
 }
 
@@ -948,22 +1119,20 @@ class _MetricDotPainter extends FlDotPainter {
   _MetricDotPainter({
     required this.label,
     required this.color,
-    this.radius = 4,
-    this.strokeWidth = 2,
-    this.strokeColor = Colors.white,
-    this.labelGap = 8,
+    this.shiftLeft = false,
   });
 
   final String label;
   final Color color;
-  final double radius;
-  final double strokeWidth;
-  final Color strokeColor;
-  final double labelGap;
+  final bool shiftLeft;
+  final double radius = 4;
+  final double strokeWidth = 2;
+  final Color strokeColor = Colors.white;
+  final double labelGap = 8;
 
   @override
   void draw(Canvas canvas, FlSpot spot, Offset offsetInCanvas) {
-    if (strokeWidth != 0.0 && strokeColor.opacity != 0.0) {
+    if (strokeWidth != 0.0 && strokeColor.a != 0.0) {
       canvas.drawCircle(
         offsetInCanvas,
         radius + (strokeWidth / 2),
@@ -995,8 +1164,8 @@ class _MetricDotPainter extends FlDotPainter {
       textDirection: ui.TextDirection.ltr,
     )..layout();
 
-    final textOffset = Offset(
-      offsetInCanvas.dx - (textPainter.width / 2),
+  final textOffset = Offset(
+      offsetInCanvas.dx - (textPainter.width / 2) - (shiftLeft ? 4 : 0),
       offsetInCanvas.dy - radius - labelGap - textPainter.height,
     );
 
@@ -1013,6 +1182,5 @@ class _MetricDotPainter extends FlDotPainter {
   FlDotPainter lerp(FlDotPainter a, FlDotPainter b, double t) => b;
 
   @override
-  List<Object?> get props => [label, color, radius, strokeWidth, strokeColor, labelGap];
+  List<Object?> get props => [label, color, shiftLeft, radius, strokeWidth, strokeColor, labelGap];
 }
-

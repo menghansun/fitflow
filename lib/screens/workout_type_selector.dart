@@ -42,7 +42,7 @@ class WorkoutTypeSelectorSheet extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             initialDate != null
-                ? '为 ${initialDate!.month}/${initialDate!.day} 记录运动'
+                ? '在 ${initialDate!.month}/${initialDate!.day} 记录运动'
                 : '记录你的今日运动',
             style: theme.textTheme.bodyMedium,
           ),

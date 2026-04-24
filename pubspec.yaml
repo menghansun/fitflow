@@ -28,7 +28,7 @@ dependencies:
 
   # Utilities
   uuid: ^4.5.1
-  intl: ^0.19.0
+  intl: ^0.20.2
   shared_preferences: ^2.3.2
   url_launcher: ^6.3.1
   share_plus: ^10.1.4
@@ -64,5 +64,6 @@ flutter:
     - assets/exercises/
     - assets/splash.gif
     - assets/achievement/
+    - assets/legal/
     - assets/body_front.jpeg
     - assets/body_back.jpeg

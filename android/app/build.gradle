@@ -12,6 +12,19 @@ if (localPropertiesFile.exists()) {
     }
 }
 
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('key.properties')
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+def requiredKeystoreKeys = ['storeFile', 'storePassword', 'keyAlias', 'keyPassword']
+def missingKeystoreKeys = requiredKeystoreKeys.findAll { !keystoreProperties[it] }
+def releaseKeystoreFile = keystoreProperties['storeFile'] ? rootProject.file(keystoreProperties['storeFile']) : null
+def hasReleaseSigningConfig = keystorePropertiesFile.exists() &&
+        missingKeystoreKeys.isEmpty() &&
+        releaseKeystoreFile?.exists()
+
 def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
 if (flutterVersionCode == null) {
     flutterVersionCode = '1'
@@ -53,16 +66,24 @@ android {
 
     signingConfigs {
         release {
-            storeFile rootProject.file("app/fitflow.keystore")
-            storePassword "FitFlow2026!"
-            keyAlias "fitflow"
-            keyPassword "FitFlow2026!"
+            if (hasReleaseSigningConfig) {
+                storeFile releaseKeystoreFile
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
         }
     }
 
     buildTypes {
         release {
-            signingConfig signingConfigs.release
+            if (hasReleaseSigningConfig) {
+                signingConfig signingConfigs.release
+            } else {
+                // Local fallback: still allow release build for testing with debug key.
+                signingConfig signingConfigs.debug
+                println("WARNING: Release signing is not configured. Using debug signing for local release build. Configure android/key.properties for production builds.")
+            }
             minifyEnabled false
             shrinkResources false
         }

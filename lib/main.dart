@@ -13,6 +13,8 @@ import 'providers/body_metrics_provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/main_screen.dart';
 import 'screens/auth/login_screen.dart';
+import 'screens/profile/profile_screen.dart';
+import 'screens/design_preview/design_preview_screen.dart';
 import 'widgets/achievement_unlock_dialog.dart';
 
 void main() async {
@@ -53,12 +55,12 @@ class _FitFlowAppState extends State<FitFlowApp> {
           return Consumer<UserProvider>(
             builder: (context, userProvider, _) {
               if (!userProvider.initialized) {
-                return _buildMaterialApp(ThemeMode.system, const _SplashScreen());
+                return _buildMaterialApp(ThemeMode.light, const _SplashScreen());
               }
 
               // Not logged in → login screen
               if (!isLoggedIn) {
-                return _buildMaterialApp(ThemeMode.system, const LoginScreen());
+                return _buildMaterialApp(ThemeMode.light, const LoginScreen());
               }
 
               // Logged in → load workout data
@@ -122,7 +124,7 @@ class _FitFlowAppState extends State<FitFlowApp> {
                 });
               }
 
-              const themeMode = ThemeMode.system;
+              const themeMode = ThemeMode.light;
               return _buildMaterialApp(
                 themeMode,
                 const MainScreen(),
@@ -147,6 +149,10 @@ class _FitFlowAppState extends State<FitFlowApp> {
         Locale('zh', 'CN'),
         Locale('en', 'US'),
       ],
+      routes: {
+        '/profile': (_) => const ProfileScreen(),
+        '/design-preview': (_) => const DesignPreviewScreen(),
+      },
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,

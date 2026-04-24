@@ -100,7 +100,7 @@ class AchievementProvider extends ChangeNotifier {
     final totalCalorie = sessions.fold<int>(0, (sum, s) => sum + (s.calories ?? 0));
     await update(AchievementType.calorie1000, totalCalorie ~/ 100);
 
-    // 时长成就 - 单次最长时间
+    // 时长成就 - 单次最长时长
     final maxSingleDuration = sessions.fold<int>(0, (max, s) {
       final dur = s.durationInMinutes;
       return dur > max ? dur : max;

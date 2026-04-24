@@ -45,10 +45,26 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       setState(() {
-        _error = e.toString();
+        _error = _mapError(e);
         _loading = false;
       });
     }
+  }
+
+  String _mapError(Object error) {
+    final raw = error.toString();
+    if (error is SupabaseConfigException) {
+      return raw;
+    }
+    if (raw.contains('Failed host lookup') ||
+        raw.contains('SocketException') ||
+        raw.contains('ClientException')) {
+      return '网络或服务地址不可用。若你还没配置 Supabase，请先填写真实的 supabaseUrl 和 supabaseAnonKey。';
+    }
+    if (raw.startsWith('Exception: ')) {
+      return raw.substring('Exception: '.length);
+    }
+    return raw;
   }
 
   @override
@@ -148,6 +164,14 @@ class _LoginScreenState extends State<LoginScreen> {
                             _error = null;
                           }),
                   child: Text(_isLogin ? '没有账户？立即注册' : '已有账户？登录'),
+                ),
+                const SizedBox(height: 4),
+                TextButton.icon(
+                  onPressed: _loading
+                      ? null
+                      : () => Navigator.pushNamed(context, '/design-preview'),
+                  icon: const Icon(Icons.web),
+                  label: const Text('查看 UI 预览'),
                 ),
               ],
             ),

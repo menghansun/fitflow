@@ -12,7 +12,6 @@ import '../../providers/workout_provider.dart';
 
 // Swim accent colors
 const _swimPrimary = Color(0xFF00D4FF);
-const _swimDark = Color(0xFF0099CC);
 const _swimLight = Color(0xFFE0F7FF);
 
 class _SwimMilestone {
@@ -104,7 +103,7 @@ List<_SwimMilestone> _computeMilestones(List<WorkoutSession> allSwimSessions) {
     milestones.add(_SwimMilestone(
       emoji: '⚡',
       title: '最快配速',
-      value: "$min\'${sec.toString().padLeft(2, '0')}/百米",
+      value: "$min'${sec.toString().padLeft(2, '0')}/百米",
       achievedAt: bestPaceDate,
       achieved: true,
     ));
@@ -181,32 +180,6 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
         setState(() => _loading = false);
       }
     }
-  }
-
-  void _goToPrevMonth() {
-    setState(() {
-      if (_month == 1) {
-        _month = 12;
-        _year--;
-      } else {
-        _month--;
-      }
-    });
-    _loadSwimData();
-  }
-
-  void _goToNextMonth() {
-    final now = DateTime.now();
-    if (_year > now.year || (_year == now.year && _month >= now.month)) return;
-    setState(() {
-      if (_month == 12) {
-        _month = 1;
-        _year++;
-      } else {
-        _month++;
-      }
-    });
-    _loadSwimData();
   }
 
   Future<void> _showMonthPicker() async {
@@ -302,7 +275,7 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
       }
 
       final tempDir = await getTemporaryDirectory();
-      final fileName = 'FitFlow_${_year}${_month.toString().padLeft(2, '0')}_report.png';
+      final fileName = 'FitFlow_$_year${_month.toString().padLeft(2, '0')}_report.png';
       final file = File('${tempDir.path}/$fileName');
       await file.writeAsBytes(byteData.buffer.asUint8List());
 
@@ -496,7 +469,7 @@ class _MonthPickerDialogState extends State<_MonthPickerDialog> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          '${month}月',
+                          '$month月',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 16,
@@ -589,7 +562,7 @@ class _SwimReportContent extends StatelessWidget {
         : (totalDistance > 0 ? 100 : 0);
     final countDelta = prevCount > 0
         ? ((sessions.length - prevCount) / prevCount * 100).round()
-        : (sessions.length > 0 ? 100 : 0);
+        : (sessions.isNotEmpty ? 100 : 0);
     final paceDelta = prevAvgPace != null && prevAvgPace > 0
         ? ((_calcPaceValue(sessions)! - prevAvgPace) / prevAvgPace * 100).round()
         : 0;
@@ -627,7 +600,7 @@ class _SwimReportContent extends StatelessWidget {
             Expanded(child: _SwimStatCard(
               icon: '📏',
               label: '总距离',
-              value: '${(totalDistance / 1000).toStringAsFixed(1)}',
+              value: (totalDistance / 1000).toStringAsFixed(1),
               unit: '公里',
               color: _swimPrimary,
             )),
@@ -985,7 +958,7 @@ class _MonthHeatmapCard extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                '${_styleEmoji(dailyStyle[day]!)}',
+                                _styleEmoji(dailyStyle[day]!),
                                 style: const TextStyle(fontSize: 8),
                               ),
                               const SizedBox(width: 1),
@@ -1030,123 +1003,6 @@ class _MonthHeatmapCard extends StatelessWidget {
               )),
               const SizedBox(width: 4),
               Text('高', style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MilestonesCard extends StatelessWidget {
-  final List<_SwimMilestone> milestones;
-
-  const _MilestonesCard({required this.milestones});
-
-  @override
-  Widget build(BuildContext context) {
-    final achieved = milestones.where((m) => m.achieved).toList();
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 15,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Text('🏆', style: TextStyle(fontSize: 16)),
-              const SizedBox(width: 6),
-              const Text('游泳成就', style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF3D3D3D),
-              )),
-              const Spacer(),
-              Text(
-                '${achieved.length}已解锁',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: _swimPrimary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: milestones.map((m) => _MilestoneChip(milestone: m)).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MilestoneChip extends StatelessWidget {
-  final _SwimMilestone milestone;
-
-  const _MilestoneChip({required this.milestone});
-
-  @override
-  Widget build(BuildContext context) {
-    final achieved = milestone.achieved;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: achieved
-            ? _swimPrimary.withValues(alpha: 0.1)
-            : Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: achieved
-              ? _swimPrimary.withValues(alpha: 0.3)
-              : Colors.grey.shade300,
-          width: 1,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            milestone.emoji,
-            style: TextStyle(
-              fontSize: 16,
-              color: achieved ? null : Colors.grey,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                milestone.title,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: achieved ? const Color(0xFF3D3D3D) : Colors.grey,
-                ),
-              ),
-              Text(
-                milestone.value,
-                style: TextStyle(
-                  fontSize: 10,
-                  color: achieved ? _swimPrimary : Colors.grey.shade400,
-                ),
-              ),
             ],
           ),
         ],
@@ -1248,7 +1104,7 @@ class _SwimHeaderCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${sessionCount}次训练 · ${(totalDistance / 1000).toStringAsFixed(1)}公里',
+                  '$sessionCount次训练 · ${(totalDistance / 1000).toStringAsFixed(1)}公里',
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.85),
                     fontSize: 14,
@@ -1849,7 +1705,7 @@ class _PersonalRecordsCard extends StatelessWidget {
                   )),
                   Expanded(child: _RecordTile(
                     label: '最久时长',
-                    value: longestSession > 0 ? '${longestSession}分钟' : '--',
+                    value: longestSession > 0 ? '$longestSession分钟' : '--',
                     color: const Color(0xFF52C9A4),
                   )),
                   Expanded(child: _RecordTile(
@@ -1873,13 +1729,11 @@ class _PersonalRecordsCard extends StatelessWidget {
 }
 
 class _RecordTile extends StatelessWidget {
-  final String? icon;
   final String label;
   final String value;
   final Color color;
 
   const _RecordTile({
-    this.icon,
     required this.label,
     required this.value,
     required this.color,
@@ -1895,10 +1749,6 @@ class _RecordTile extends StatelessWidget {
       ),
       child: Column(
         children: [
-          if (icon != null) ...[
-            Text(icon!, style: const TextStyle(fontSize: 18)),
-            const SizedBox(height: 6),
-          ],
           Text(
             value,
             style: TextStyle(

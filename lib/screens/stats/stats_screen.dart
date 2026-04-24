@@ -61,7 +61,7 @@ class _StatsScreenState extends State<StatsScreen>
     switch (_tabCtrl.index) {
       case 0:
         final weekNum = _getWeekNumber(_currentDate);
-        return '${_currentDate.year}年第${weekNum}周运动报告';
+        return '${_currentDate.year}年第$weekNum周运动报告';
       case 1:
         return '${_currentDate.year}年${_currentDate.month}月运动报告';
       case 2:
@@ -529,7 +529,7 @@ class _MonthStatsView extends StatelessWidget {
                                 icon: '🏋️',
                                 label: '健身',
                                 value: '${gymSessions.length}次',
-                                subValue: '${gymSets}组',
+                                subValue: '$gymSets组',
                                 bgColor: isDark ? const Color(0xFF2D2D4A) : const Color(0xFFF3F0FF),
                               )),
                               const SizedBox(width: 8),
@@ -537,7 +537,7 @@ class _MonthStatsView extends StatelessWidget {
                                 icon: '❤️',
                                 label: '有氧',
                                 value: '${cardioSessions.length}次',
-                                subValue: '${cardioMins}分钟',
+                                subValue: '$cardioMins分钟',
                                 bgColor: isDark ? const Color(0xFF2D2D4A) : const Color(0xFFF3F0FF),
                               )),
                             ],
@@ -594,7 +594,7 @@ class _WeekStatsView extends StatelessWidget {
     final cardBg = isDark ? AppColors.darkCard : Colors.white;
     final cardShadow = isDark ? Colors.black.withValues(alpha: 0.3) : Colors.black.withValues(alpha: 0.06);
     final weekNum = _getWeekNumber(start);
-    final weekLabel = '${start.year}年 第${weekNum}周';
+    final weekLabel = '${start.year}年 第$weekNum周';
 
     return Consumer<WorkoutProvider>(
       builder: (context, provider, _) {
@@ -769,7 +769,7 @@ class _WeekStatsView extends StatelessWidget {
                                 icon: '🏋️',
                                 label: '健身',
                                 value: '${gymSessions.length}次',
-                                subValue: '${gymSets}组',
+                                subValue: '$gymSets组',
                                 bgColor: isDark ? const Color(0xFF2D2D4A) : const Color(0xFFF3F0FF),
                               )),
                               const SizedBox(width: 8),
@@ -777,7 +777,7 @@ class _WeekStatsView extends StatelessWidget {
                                 icon: '❤️',
                                 label: '有氧',
                                 value: '${cardioSessions.length}次',
-                                subValue: '${cardioMins}分钟',
+                                subValue: '$cardioMins分钟',
                                 bgColor: isDark ? const Color(0xFF2D2D4A) : const Color(0xFFF3F0FF),
                               )),
                             ],
@@ -1018,7 +1018,7 @@ class _YearStatsView extends StatelessWidget {
                                 icon: '🏋️',
                                 label: '健身',
                                 value: '${gymSessions.length}次',
-                                subValue: '${gymSets}组',
+                                subValue: '$gymSets组',
                                 bgColor: isDark ? const Color(0xFF2D2D4A) : const Color(0xFFF3F0FF),
                               )),
                               const SizedBox(width: 8),
@@ -1026,7 +1026,7 @@ class _YearStatsView extends StatelessWidget {
                                 icon: '❤️',
                                 label: '有氧',
                                 value: '${cardioSessions.length}次',
-                                subValue: '${cardioMins}分钟',
+                                subValue: '$cardioMins分钟',
                                 bgColor: isDark ? const Color(0xFF2D2D4A) : const Color(0xFFF3F0FF),
                               )),
                             ],
@@ -1198,7 +1198,7 @@ class _YearHeatmapFullscreenDialogState extends State<_YearHeatmapFullscreenDial
                               ? Align(
                                   alignment: Alignment.centerLeft,
                                   child: Text(
-                                    '${monthLabel}月',
+                                    '$monthLabel月',
                                     style: TextStyle(color: textColor.withValues(alpha: 0.7), fontSize: 9),
                                   ),
                                 )
@@ -1251,7 +1251,7 @@ class _YearHeatmapFullscreenDialogState extends State<_YearHeatmapFullscreenDial
                             return Padding(
                               padding: EdgeInsets.only(bottom: dayIdx < 6 ? spacing : 0),
                               child: Tooltip(
-                                message: '${date.month}/${date.day}: ${cal}千卡',
+                                message: '${date.month}/${date.day}: $cal千卡',
                                 child: Container(
                                   width: squareSize,
                                   height: squareSize,
@@ -1792,7 +1792,7 @@ class _DefaultStatsView extends StatelessWidget {
                   color: AppColors.swimAccent),
               _SummaryTile(
                   label: '游泳距离',
-                  value: '${(swimDist / 1000).toStringAsFixed(1)}',
+                  value: (swimDist / 1000).toStringAsFixed(1),
                   unit: 'km',
                   icon: '🛟',
                   color: AppColors.swimAccent),
@@ -2815,7 +2815,7 @@ class _MonthPickerDialogState extends State<_MonthPickerDialog> {
                       ),
                       alignment: Alignment.center,
                       child: Text(
-                        '${month}月',
+                        '$month月',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,

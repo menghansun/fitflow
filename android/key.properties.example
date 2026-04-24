@@ -1,0 +1,4 @@
+storeFile=app/fitflow.keystore
+storePassword=your_store_password
+keyAlias=fitflow
+keyPassword=your_key_password
