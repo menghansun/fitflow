@@ -105,6 +105,20 @@ class ProfileScreen extends StatelessWidget {
                     onTap: () => _showEditProfile(context, user, userProvider),
                   ),
                   _ProfileMenuTile(
+                    icon: Icons.assignment_outlined,
+                    color: const Color(0xFF4F46E5),
+                    title: '训练计划',
+                    subtitle: '根据目标查看本周安排和今日建议',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const TrainingPlanScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  _ProfileMenuTile(
                     icon: Icons.bar_chart_rounded,
                     color: const Color(0xFF0EA5E9),
                     title: '游泳报告',
@@ -163,20 +177,6 @@ class ProfileScreen extends StatelessWidget {
               _ProfileGroupCard(
                 title: '健身',
                 children: [
-                  _ProfileMenuTile(
-                    icon: Icons.assignment_outlined,
-                    color: const Color(0xFF4F46E5),
-                    title: '训练计划',
-                    subtitle: '根据目标查看本周安排和今日建议',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const TrainingPlanScreen(),
-                        ),
-                      );
-                    },
-                  ),
                   _ProfileMenuTile(
                     icon: Icons.fitness_center_outlined,
                     color: AppColors.gymAccent,
@@ -465,33 +465,49 @@ class _HeroProfileCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              CircleAvatar(
-                radius: 30,
-                backgroundColor: Colors.white.withValues(alpha: 0.16),
-                child: Text(
-                  user.avatarEmoji ?? '💪',
-                  style: const TextStyle(fontSize: 28),
+              GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const BodyMetricsScreen(),
+                  ),
+                ),
+                child: CircleAvatar(
+                  radius: 30,
+                  backgroundColor: Colors.white.withValues(alpha: 0.16),
+                  child: Text(
+                    user.avatarEmoji ?? '💪',
+                    style: const TextStyle(fontSize: 28),
+                  ),
                 ),
               ),
               const SizedBox(width: 14),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      user.nickname,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
+                child: GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const BodyMetricsScreen(),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user.nickname,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '持续运动第 ${_daysSince(user.createdAt)} 天',
-                      style: const TextStyle(color: Colors.white70),
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      Text(
+                        '持续运动第 ${_daysSince(user.createdAt)} 天',
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               InkWell(

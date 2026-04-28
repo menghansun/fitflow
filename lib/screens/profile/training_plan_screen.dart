@@ -15,10 +15,28 @@ import '../../theme/app_theme.dart';
 enum _TrainingGoalType {
   fatLoss,
   muscleGain,
-  endurance,
-  strength,
   swimPerformance,
   consistency,
+}
+
+_TrainingGoalType _parseTrainingGoalType(String? name) {
+  switch (name) {
+    case 'fatLoss':
+      return _TrainingGoalType.fatLoss;
+    case 'muscleGain':
+      return _TrainingGoalType.muscleGain;
+    case 'swimPerformance':
+      return _TrainingGoalType.swimPerformance;
+    case 'consistency':
+      return _TrainingGoalType.consistency;
+    // Legacy keys (older app versions had 6 goal types).
+    case 'endurance':
+      return _TrainingGoalType.fatLoss;
+    case 'strength':
+      return _TrainingGoalType.muscleGain;
+    default:
+      return _TrainingGoalType.consistency;
+  }
 }
 
 enum _PlanSessionKind {
@@ -114,10 +132,7 @@ class _GoalConfig {
   factory _GoalConfig.fromJson(Map<String, dynamic> json) {
     final goalTypeName = json['goalType'] as String?;
     return _GoalConfig(
-      goalType: _TrainingGoalType.values.firstWhere(
-        (item) => item.name == goalTypeName,
-        orElse: () => _TrainingGoalType.consistency,
-      ),
+      goalType: _parseTrainingGoalType(goalTypeName),
       trainingDaysPerWeek: (json['trainingDaysPerWeek'] as num?)?.toInt() ?? 4,
       targetWeightKg: (json['targetWeightKg'] as num?)?.toDouble(),
       targetBodyFatPercentage:
@@ -128,6 +143,32 @@ class _GoalConfig {
       targetStreakDays: (json['targetStreakDays'] as num?)?.toInt(),
     );
   }
+}
+
+class _WeeklyDirectionProgress {
+  final String focusTitle;
+  final String focusSubtitle;
+  final int strengthDone;
+  final int strengthTarget;
+  final int swimCardioDone;
+  final int swimCardioTarget;
+  final int recoveryDone;
+  final int recoveryTarget;
+  final double overallRatio;
+  final String nextStep;
+
+  const _WeeklyDirectionProgress({
+    required this.focusTitle,
+    required this.focusSubtitle,
+    required this.strengthDone,
+    required this.strengthTarget,
+    required this.swimCardioDone,
+    required this.swimCardioTarget,
+    required this.recoveryDone,
+    required this.recoveryTarget,
+    required this.overallRatio,
+    required this.nextStep,
+  });
 }
 
 class _GoalProgress {
@@ -274,6 +315,12 @@ class _TrainingPlanScreenState extends State<TrainingPlanScreen> {
 
         final weeklySessions = workoutProvider.sessionsInPeriod(weekStart, weekEnd);
         final monthlySessions = workoutProvider.sessionsInPeriod(monthStart, monthEnd);
+        final weeklyDirection = _buildWeeklyDirectionProgress(
+          config: _config,
+          sessions: sessions,
+          weekStart: weekStart,
+          now: now,
+        );
         final progress = _buildGoalProgress(
           config: _config,
           metrics: metrics,
@@ -284,11 +331,7 @@ class _TrainingPlanScreenState extends State<TrainingPlanScreen> {
           config: _config,
           sessions: sessions,
           weeklySessions: weeklySessions,
-        );
-        final weeklyPlan = _buildWeeklyPlan(
           now: now,
-          config: _config,
-          sessions: sessions,
         );
         final actions = _buildActionItems(
           config: _config,
@@ -318,6 +361,13 @@ class _TrainingPlanScreenState extends State<TrainingPlanScreen> {
                   onEdit: () => _showGoalEditor(context, user.id, _config),
                 ),
                 const SizedBox(height: 16),
+                const _SectionTitle(
+                  title: '本周训练方向',
+                  subtitle: '按计划类型统计每周目标和完成进度',
+                ),
+                const SizedBox(height: 12),
+                _WeeklyDirectionCard(progress: weeklyDirection),
+                const SizedBox(height: 16),
                 _SectionTitle(
                   title: '目标进度',
                   subtitle: progress.hint,
@@ -327,21 +377,10 @@ class _TrainingPlanScreenState extends State<TrainingPlanScreen> {
                 const SizedBox(height: 16),
                 _SectionTitle(
                   title: '今日建议',
-                  subtitle: '根据最近 4 周训练结构和本周完成度动态生成',
+                  subtitle: '与本周安排一致，并结合今天 / 昨天是否已训练',
                 ),
                 const SizedBox(height: 12),
                 _SuggestionCard(suggestion: suggestion),
-                const SizedBox(height: 16),
-                _SectionTitle(
-                  title: '本周安排',
-                  subtitle:
-                      '目标 ${_goalLabel(_config.goalType)} · 每周 ${_config.trainingDaysPerWeek} 天',
-                ),
-                const SizedBox(height: 12),
-                ...weeklyPlan.map((item) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _PlannedDayCard(day: item),
-                    )),
                 const SizedBox(height: 16),
                 _SectionTitle(
                   title: '执行重点',
@@ -436,7 +475,12 @@ class _TrainingPlanScreenState extends State<TrainingPlanScreen> {
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
-                        children: _TrainingGoalType.values.map((goal) {
+                        children: [
+                          _TrainingGoalType.fatLoss,
+                          _TrainingGoalType.muscleGain,
+                          _TrainingGoalType.swimPerformance,
+                          _TrainingGoalType.consistency,
+                        ].map((goal) {
                           final selected = selectedGoal == goal;
                           return ChoiceChip(
                             label: Text(_goalLabel(goal)),
@@ -520,6 +564,97 @@ DateTime _startOfWeek(DateTime date) {
   return normalized.subtract(Duration(days: normalized.weekday - 1));
 }
 
+_WeeklyDirectionProgress _buildWeeklyDirectionProgress({
+  required _GoalConfig config,
+  required List<WorkoutSession> sessions,
+  required DateTime weekStart,
+  required DateTime now,
+}) {
+  // 根据目标类型确定每周目标次数
+  final targets = _getWeeklyTargets(config);
+  final strengthTarget = targets['strength']!;
+  final swimCardioTarget = targets['swimCardio']!;
+  final recoveryTarget = targets['recovery']!;
+
+  // 统计本周已完成次数
+  final weekDates = List.generate(7, (index) => weekStart.add(Duration(days: index)));
+  var strengthDone = 0;
+  var swimCardioDone = 0;
+  var recoveryDone = 0;
+
+  for (final date in weekDates) {
+    final daySessions = sessions.where((s) => _isSameDay(s.date, date)).toList();
+    for (final session in daySessions) {
+      switch (session.type) {
+        case WorkoutType.gym:
+          strengthDone++;
+          break;
+        case WorkoutType.swim:
+        case WorkoutType.cardio:
+          swimCardioDone++;
+          break;
+        default:
+          break;
+      }
+    }
+  }
+
+  final totalTarget = strengthTarget + swimCardioTarget + recoveryTarget;
+  final totalDone = strengthDone + swimCardioDone + recoveryDone;
+  final overallRatio =
+      totalTarget == 0 ? 0.0 : (totalDone / totalTarget).clamp(0.0, 1.0);
+
+  final focusTitle = switch (config.goalType) {
+    _TrainingGoalType.fatLoss => '本周重点：燃脂 + 保肌肉',
+    _TrainingGoalType.muscleGain => '本周重点：力量训练为主',
+    _TrainingGoalType.swimPerformance => '本周重点：游泳专项推进',
+    _TrainingGoalType.consistency => '本周重点：先稳定连续性',
+  };
+  final focusSubtitle = switch (config.goalType) {
+    _TrainingGoalType.fatLoss => '2 天力量 + 2 天游泳/有氧，保证消耗同时保住肌肉量。',
+    _TrainingGoalType.muscleGain => '至少 3 天力量训练，游泳/有氧用于补充心肺与恢复。',
+    _TrainingGoalType.swimPerformance => '优先完成技术课和耐力课，陆上训练做辅助。',
+    _TrainingGoalType.consistency => '按计划把训练做完，比追求强度更重要。',
+  };
+
+  final nextStep = switch (true) {
+    _ when strengthDone < strengthTarget =>
+      '下一步：本周还差 ${strengthTarget - strengthDone} 次力量训练。',
+    _ when swimCardioDone < swimCardioTarget =>
+      '下一步：本周还差 ${swimCardioTarget - swimCardioDone} 次游泳/有氧。',
+    _ when recoveryDone < recoveryTarget =>
+      '下一步：预留 ${recoveryTarget - recoveryDone} 次拉伸或休息，保证恢复。',
+    _ => '下一步：本周目标已完成，按状态保持即可。',
+  };
+
+  return _WeeklyDirectionProgress(
+    focusTitle: focusTitle,
+    focusSubtitle: focusSubtitle,
+    strengthDone: strengthDone,
+    strengthTarget: strengthTarget,
+    swimCardioDone: swimCardioDone,
+    swimCardioTarget: swimCardioTarget,
+    recoveryDone: recoveryDone,
+    recoveryTarget: recoveryTarget,
+    overallRatio: overallRatio,
+    nextStep: nextStep,
+  );
+}
+
+Map<String, int> _getWeeklyTargets(_GoalConfig config) {
+  // 返回 Map: 'strength', 'swimCardio', 'recovery'
+  switch (config.goalType) {
+    case _TrainingGoalType.fatLoss:
+      return {'strength': 2, 'swimCardio': 2, 'recovery': 0};
+    case _TrainingGoalType.muscleGain:
+      return {'strength': 3, 'swimCardio': 1, 'recovery': 1};
+    case _TrainingGoalType.swimPerformance:
+      return {'strength': 1, 'swimCardio': 4, 'recovery': 0};
+    case _TrainingGoalType.consistency:
+      return {'strength': 2, 'swimCardio': 2, 'recovery': 1};
+  }
+}
+
 _GoalProgress _buildGoalProgress({
   required _GoalConfig config,
   required BodyMetrics? metrics,
@@ -531,9 +666,10 @@ _GoalProgress _buildGoalProgress({
       final currentWeight = metrics?.weight;
       final targetWeight = config.targetWeightKg;
       if (currentWeight != null && targetWeight != null) {
-        final baseline = (currentWeight > targetWeight ? currentWeight : targetWeight) + 3;
-        final ratio = ((baseline - currentWeight) / (baseline - targetWeight))
-            .clamp(0.0, 1.0);
+        final baseline =
+            (currentWeight > targetWeight ? currentWeight : targetWeight) + 3;
+        final ratio =
+            ((baseline - currentWeight) / (baseline - targetWeight)).clamp(0.0, 1.0);
         return _GoalProgress(
           title: '减脂体重目标',
           currentLabel: '${currentWeight.toStringAsFixed(1)} kg',
@@ -559,8 +695,8 @@ _GoalProgress _buildGoalProgress({
       final targetMuscle = config.targetMuscleMassKg;
       if (currentMuscle != null && targetMuscle != null) {
         final baseline = currentMuscle - 2 <= 0 ? currentMuscle : currentMuscle - 2;
-        final ratio = ((currentMuscle - baseline) / (targetMuscle - baseline))
-            .clamp(0.0, 1.0);
+        final ratio =
+            ((currentMuscle - baseline) / (targetMuscle - baseline)).clamp(0.0, 1.0);
         return _GoalProgress(
           title: '增肌目标',
           currentLabel: '${currentMuscle.toStringAsFixed(1)} kg',
@@ -583,36 +719,20 @@ _GoalProgress _buildGoalProgress({
         ratio: (thisWeek / config.trainingDaysPerWeek).clamp(0.0, 1.0),
         hint: '未设置肌肉量目标，当前按周训练频率跟踪。',
       );
-    case _TrainingGoalType.endurance:
     case _TrainingGoalType.swimPerformance:
-      final currentDistanceKm = monthlySessions.fold<double>(
+      final swimDistanceKm = monthlySessions
+          .where((s) => s.type == WorkoutType.swim)
+          .fold<double>(
             0,
             (sum, session) => sum + ((session.totalDistanceMeters ?? 0) / 1000),
           );
       final targetKm = config.targetMonthlyDistanceKm ?? 20;
       return _GoalProgress(
-        title: config.goalType == _TrainingGoalType.swimPerformance
-            ? '月游泳距离目标'
-            : '月耐力距离目标',
-        currentLabel: '${currentDistanceKm.toStringAsFixed(1)} km',
+        title: '月游泳距离目标',
+        currentLabel: '${swimDistanceKm.toStringAsFixed(1)} km',
         targetLabel: '${targetKm.toStringAsFixed(0)} km',
-        ratio: (currentDistanceKm / targetKm).clamp(0.0, 1.0),
-        hint: '按本月累计距离跟踪，适合跑步、骑行、游泳。',
-      );
-    case _TrainingGoalType.strength:
-      final gymSessions = workoutProvider
-          .sessionsInPeriod(
-            _startOfWeek(DateTime.now()),
-            _startOfWeek(DateTime.now()).add(const Duration(days: 6)),
-          )
-          .where((session) => session.type == WorkoutType.gym)
-          .length;
-      return _GoalProgress(
-        title: '力量训练频率',
-        currentLabel: '$gymSessions 次',
-        targetLabel: '${config.trainingDaysPerWeek} 次/周',
-        ratio: (gymSessions / config.trainingDaysPerWeek).clamp(0.0, 1.0),
-        hint: '力量提升先看频率稳定，再看负重和动作质量。',
+        ratio: (swimDistanceKm / targetKm).clamp(0.0, 1.0),
+        hint: '按本月游泳累计距离跟踪；可与周计划中的技术课、耐力课配合。',
       );
     case _TrainingGoalType.consistency:
       final streak = workoutProvider.currentStreak;
@@ -631,27 +751,20 @@ _PlanSuggestion _buildTodaySuggestion({
   required _GoalConfig config,
   required List<WorkoutSession> sessions,
   required List<WorkoutSession> weeklySessions,
+  required DateTime now,
 }) {
-  final today = DateTime.now();
-  final trainedToday = sessions.any(
-    (session) =>
-        session.date.year == today.year &&
-        session.date.month == today.month &&
-        session.date.day == today.day,
-  );
-  final trainedYesterday = sessions.any(
-    (session) {
-      final date = today.subtract(const Duration(days: 1));
-      return session.date.year == date.year &&
-          session.date.month == date.month &&
-          session.date.day == date.day;
-    },
-  );
-  final remaining = (config.trainingDaysPerWeek - weeklySessions.length).clamp(0, 7);
-  final recentTypes = sessions.take(6).map((item) => item.type).toList();
-  final lastType = recentTypes.isEmpty ? null : recentTypes.first;
-  final lastGymFocus = _lastGymFocus(sessions);
-  final nextGymFocus = _nextGymFocus(sessions, config.goalType);
+  final today = DateTime(now.year, now.month, now.day);
+  final todaySessions = sessions.where((s) => _isSameDay(s.date, today)).toList();
+  final trainedToday = todaySessions.isNotEmpty;
+
+  final targets = _getWeeklyTargets(config);
+  final strengthDone = weeklySessions.where((s) => s.type == WorkoutType.gym).length;
+  final swimCardioDone = weeklySessions
+      .where((s) => s.type == WorkoutType.swim || s.type == WorkoutType.cardio)
+      .length;
+
+  final strengthRemaining = (targets['strength']! - strengthDone).clamp(0, 999);
+  final swimCardioRemaining = (targets['swimCardio']! - swimCardioDone).clamp(0, 999);
 
   if (trainedToday) {
     return const _PlanSuggestion(
@@ -663,478 +776,216 @@ _PlanSuggestion _buildTodaySuggestion({
     );
   }
 
-  if (remaining == 0) {
-    return const _PlanSuggestion(
-      title: '本周任务已完成',
-      subtitle: '可以安排轻松散步、拉伸或完全休息，重点是让下周继续稳定。',
-      intensity: '低',
-      color: Color(0xFF34C759),
-      icon: Icons.celebration_outlined,
-    );
-  }
-
-  switch (config.goalType) {
-    case _TrainingGoalType.fatLoss:
-      return _PlanSuggestion(
-        title: trainedYesterday ? '轻中强度有氧 + 核心' : '优先做一节燃脂训练',
-        subtitle: trainedYesterday
-            ? '昨天已训练，今天做 30 到 40 分钟快走、椭圆机或骑行，再加 8 分钟核心。'
-            : '建议 20 分钟力量循环 + 20 分钟稳态有氧，先保留强度再拉长时长。',
-        intensity: '中',
-        color: AppColors.cardioAccent,
-        icon: Icons.local_fire_department_outlined,
-      );
-    case _TrainingGoalType.muscleGain:
-      final title = '今天主练 ${_gymFocusLabel(nextGymFocus)}';
-      final subtitle = lastType == WorkoutType.gym
-          ? '上一节偏向 ${_gymFocusLabel(lastGymFocus)}，今天切到 ${_gymFocusLabel(nextGymFocus)}，避免同肌群连续堆量。'
-          : '建议围绕 ${_gymFocusLabel(nextGymFocus)} 做 1 个主项 + 2 到 3 个辅助动作，周内留一次拉伸放松。';
-      return _PlanSuggestion(
-        title: title,
-        subtitle: subtitle,
-        intensity: '中高',
-        color: AppColors.gymAccent,
-        icon: Icons.fitness_center,
-      );
-    case _TrainingGoalType.endurance:
-      return const _PlanSuggestion(
-        title: '做一节可持续的耐力课',
-        subtitle: '今天优先稳态心肺 40 到 60 分钟。若本周只有一次有氧，再加 4 组短间歇。',
-        intensity: '中',
-        color: AppColors.cardioAccent,
-        icon: Icons.directions_run,
-      );
-    case _TrainingGoalType.strength:
-      return _PlanSuggestion(
-        title: '今天主练 ${_gymFocusLabel(nextGymFocus)} 力量',
-        subtitle: trainedYesterday
-            ? '昨天已训练，今天避开 ${_gymFocusLabel(lastGymFocus)}，改做 ${_gymFocusLabel(nextGymFocus)} 主项，主动作 5 组以内。'
-            : '建议选 1 个 ${_gymFocusLabel(nextGymFocus)} 主项动作 + 2 个辅助动作，本周保留一次拉伸放松。',
-        intensity: '高',
-        color: AppColors.gymAccent,
-        icon: Icons.bolt,
-      );
-    case _TrainingGoalType.swimPerformance:
-      return const _PlanSuggestion(
-        title: '今天适合做一次专项游泳',
-        subtitle: '如果精力正常，做技术分解 + 主训练组；如果状态一般，先做配速稳定练习。',
-        intensity: '中',
-        color: AppColors.swimAccent,
-        icon: Icons.pool,
-      );
-    case _TrainingGoalType.consistency:
-      return const _PlanSuggestion(
-        title: '今天先完成最低剂量',
-        subtitle: '哪怕只有 20 分钟，也先完成一节可执行的小训练，连续性比强度更重要。',
-        intensity: '低门槛',
-        color: Color(0xFF5B5BD6),
-        icon: Icons.check_circle_outline,
-      );
-  }
-}
-
-List<_PlannedDay> _buildWeeklyPlan({
-  required DateTime now,
-  required _GoalConfig config,
-  required List<WorkoutSession> sessions,
-}) {
-  final weekStart = _startOfWeek(now);
-  final kinds = _buildAdaptiveWeekKinds(
-    goal: config.goalType,
-    trainingDays: config.trainingDaysPerWeek,
-    sessions: sessions,
-    weekStart: weekStart,
+  // 根据目标类型决定推荐逻辑
+  return _getTodaySuggestionByGoal(
+    config.goalType,
+    strengthRemaining,
+    swimCardioRemaining,
+    sessions,
+    now,
   );
-  return List.generate(7, (index) {
-    final date = weekStart.add(Duration(days: index));
-    final kind = kinds[index];
-    final completed = sessions.any(
-      (session) =>
-          session.date.year == date.year &&
-          session.date.month == date.month &&
-          session.date.day == date.day,
-    );
-    return _mapPlannedDay(date, kind, completed: completed);
-  });
 }
 
-List<_PlanSessionKind> _goalTemplate(_TrainingGoalType goal) {
-  return switch (goal) {
-    _TrainingGoalType.fatLoss => [
-        _PlanSessionKind.cardioSteady,
-        _PlanSessionKind.gymFullBody,
-        _PlanSessionKind.coreMobility,
-        _PlanSessionKind.cardioIntervals,
-        _PlanSessionKind.gymFullBody,
-        _PlanSessionKind.cardioSteady,
-        _PlanSessionKind.rest,
-      ],
-    _TrainingGoalType.muscleGain => [
-        _PlanSessionKind.gymUpper,
-        _PlanSessionKind.gymLower,
-        _PlanSessionKind.recovery,
-        _PlanSessionKind.gymPush,
-        _PlanSessionKind.gymPull,
-        _PlanSessionKind.gymFullBody,
-        _PlanSessionKind.rest,
-      ],
-    _TrainingGoalType.endurance => [
-        _PlanSessionKind.cardioSteady,
-        _PlanSessionKind.coreMobility,
-        _PlanSessionKind.cardioIntervals,
-        _PlanSessionKind.recovery,
-        _PlanSessionKind.cardioSteady,
-        _PlanSessionKind.gymFullBody,
-        _PlanSessionKind.rest,
-      ],
-    _TrainingGoalType.strength => [
-        _PlanSessionKind.gymPush,
-        _PlanSessionKind.gymPull,
-        _PlanSessionKind.recovery,
-        _PlanSessionKind.gymLower,
-        _PlanSessionKind.coreMobility,
-        _PlanSessionKind.gymFullBody,
-        _PlanSessionKind.rest,
-      ],
-    _TrainingGoalType.swimPerformance => [
-        _PlanSessionKind.swimTechnique,
-        _PlanSessionKind.coreMobility,
-        _PlanSessionKind.swimEndurance,
-        _PlanSessionKind.recovery,
-        _PlanSessionKind.swimTechnique,
-        _PlanSessionKind.gymFullBody,
-        _PlanSessionKind.rest,
-      ],
-    _TrainingGoalType.consistency => [
-        _PlanSessionKind.gymFullBody,
-        _PlanSessionKind.recovery,
-        _PlanSessionKind.cardioSteady,
-        _PlanSessionKind.rest,
-        _PlanSessionKind.gymFullBody,
-        _PlanSessionKind.coreMobility,
-        _PlanSessionKind.rest,
-      ],
-  };
+_PlanSuggestion _getTodaySuggestionByGoal(
+  _TrainingGoalType goalType,
+  int strengthRemaining,
+  int swimCardioRemaining,
+  List<WorkoutSession> sessions,
+  DateTime now,
+) {
+  switch (goalType) {
+    case _TrainingGoalType.fatLoss:
+      // 减脂：2力量 + 2游泳，按缺口比例推荐
+      if (strengthRemaining > 0 && swimCardioRemaining > 0) {
+        // 两者都缺，看缺口大小
+        final strengthRatio = strengthRemaining / 2;
+        final swimRatio = swimCardioRemaining / 2;
+        if (strengthRatio >= swimRatio) {
+          return _buildMuscleSuggestion(sessions, now, '减脂');
+        } else {
+          return const _PlanSuggestion(
+            title: '今天适合游泳/有氧',
+            subtitle: '减脂需要一定有氧消耗，游泳或慢跑都是很好的选择。',
+            intensity: '中',
+            color: Color(0xFF00A3FF),
+            icon: Icons.pool,
+          );
+        }
+      } else if (strengthRemaining > 0) {
+        return _buildMuscleSuggestion(sessions, now, '减脂');
+      } else if (swimCardioRemaining > 0) {
+        return const _PlanSuggestion(
+          title: '今天适合游泳/有氧',
+          subtitle: '本周游泳/有氧目标还没完成，去泳池或户外动一动。',
+          intensity: '中',
+          color: Color(0xFF00A3FF),
+          icon: Icons.pool,
+        );
+      } else {
+        return const _PlanSuggestion(
+          title: '本周目标已完成',
+          subtitle: '可以轻松散步、拉伸放松，或完全休息。',
+          intensity: '低',
+          color: Color(0xFF34C759),
+          icon: Icons.celebration_outlined,
+        );
+      }
+
+    case _TrainingGoalType.muscleGain:
+      // 增肌：3力量 + 1游泳，力量为主
+      if (strengthRemaining > 0) {
+        return _buildMuscleSuggestion(sessions, now, '增肌');
+      } else if (swimCardioRemaining > 0) {
+        return const _PlanSuggestion(
+          title: '今天适合游泳/有氧',
+          subtitle: '力量目标已完成，可以去泳池放松一下，辅助恢复。',
+          intensity: '中',
+          color: Color(0xFF00A3FF),
+          icon: Icons.pool,
+        );
+      } else {
+        return const _PlanSuggestion(
+          title: '本周目标已完成',
+          subtitle: '可以轻松散步、拉伸放松，或完全休息。',
+          intensity: '低',
+          color: Color(0xFF34C759),
+          icon: Icons.celebration_outlined,
+        );
+      }
+
+    case _TrainingGoalType.swimPerformance:
+      // 游泳：1力量 + 4游泳，游泳为主
+      if (swimCardioRemaining > 0) {
+        return const _PlanSuggestion(
+          title: '今天适合游泳',
+          subtitle: '游泳专项需要保持水中感觉，去泳池练一练。',
+          intensity: '中',
+          color: Color(0xFF00A3FF),
+          icon: Icons.pool,
+        );
+      } else if (strengthRemaining > 0) {
+        return _buildMuscleSuggestion(sessions, now, '游泳');
+      } else {
+        return const _PlanSuggestion(
+          title: '本周游泳目标已完成',
+          subtitle: '可以轻松散步、拉伸放松，或完全休息。',
+          intensity: '低',
+          color: Color(0xFF34C759),
+          icon: Icons.celebration_outlined,
+        );
+      }
+
+    case _TrainingGoalType.consistency:
+      // 养成习惯：2力量 + 2游泳，看缺口比例
+      if (strengthRemaining > 0 && swimCardioRemaining > 0) {
+        final strengthRatio = strengthRemaining / 2;
+        final swimRatio = swimCardioRemaining / 2;
+        if (strengthRatio >= swimRatio) {
+          return _buildMuscleSuggestion(sessions, now, '养成习惯');
+        } else {
+          return const _PlanSuggestion(
+            title: '今天适合游泳/有氧',
+            subtitle: '保持多样化的运动习惯对健康很重要。',
+            intensity: '中',
+            color: Color(0xFF00A3FF),
+            icon: Icons.pool,
+          );
+        }
+      } else if (strengthRemaining > 0) {
+        return _buildMuscleSuggestion(sessions, now, '养成习惯');
+      } else if (swimCardioRemaining > 0) {
+        return const _PlanSuggestion(
+          title: '今天适合游泳/有氧',
+          subtitle: '本周游泳/有氧目标还没完成，去泳池或户外动一动。',
+          intensity: '中',
+          color: Color(0xFF00A3FF),
+          icon: Icons.pool,
+        );
+      } else {
+        return const _PlanSuggestion(
+          title: '本周目标已完成',
+          subtitle: '可以轻松散步、拉伸放松，或完全休息。',
+          intensity: '低',
+          color: Color(0xFF34C759),
+          icon: Icons.celebration_outlined,
+        );
+      }
+  }
 }
 
-List<_PlanSessionKind> _buildAdaptiveWeekKinds({
-  required _TrainingGoalType goal,
-  required int trainingDays,
-  required List<WorkoutSession> sessions,
-  required DateTime weekStart,
-}) {
-  final template = _goalTemplate(goal).where((kind) => kind != _PlanSessionKind.rest).toList();
-  final targetDays = trainingDays.clamp(2, 6);
-  final weekDates = List.generate(7, (index) => weekStart.add(Duration(days: index)));
-  final completedThisWeek = weekDates
-      .where((date) => sessions.any((session) => _isSameDay(session.date, date)))
-      .length;
-
-  final priorTrainingStreak = _trainingStreakBeforeDate(sessions, weekStart);
-  final kinds = <_PlanSessionKind>[];
-  var templateIndex = 0;
-  var scheduledTrainings = 0;
-  var rollingStreak = priorTrainingStreak;
-
-  for (var i = 0; i < weekDates.length; i++) {
-    final remainingDays = weekDates.length - i;
-    final remainingTrainings = (targetDays - scheduledTrainings).clamp(0, remainingDays);
-    final mustTrainToday = remainingTrainings == remainingDays;
-
-    if (scheduledTrainings >= targetDays) {
-      kinds.add(_PlanSessionKind.rest);
-      rollingStreak = 0;
-      continue;
-    }
-
-    final shouldRecover = rollingStreak >= 3 && !mustTrainToday;
-    if (shouldRecover) {
-      kinds.add(_PlanSessionKind.recovery);
-      rollingStreak = 0;
-      continue;
-    }
-
-    final kind = template[templateIndex % template.length];
-    kinds.add(kind);
-    templateIndex++;
-    scheduledTrainings++;
-    rollingStreak++;
-  }
-
-  final needsRecovery = targetDays >= 3 && !kinds.contains(_PlanSessionKind.recovery);
-  if (needsRecovery) {
-    final restIndex = kinds.lastIndexOf(_PlanSessionKind.rest);
-    if (restIndex != -1) {
-      kinds[restIndex] = _PlanSessionKind.recovery;
-    }
-  }
-
-  if (completedThisWeek >= targetDays) {
-    return kinds
-        .asMap()
-        .entries
-        .map((entry) => entry.key == 0 ? entry.value : _downgradeFutureLoad(entry.value))
-        .toList();
-  }
-
-  return kinds;
+_PlanSuggestion _buildMuscleSuggestion(
+  List<WorkoutSession> sessions,
+  DateTime now,
+  String goalType,
+) {
+  final suggestion = _getMuscleGroupSuggestion(sessions, now);
+  return _PlanSuggestion(
+    title: '今天适合练${suggestion.name}',
+    subtitle: suggestion.hint,
+    intensity: '高',
+    color: const Color(0xFFFF6B6B),
+    icon: Icons.fitness_center,
+  );
 }
 
-_PlanSessionKind _downgradeFutureLoad(_PlanSessionKind kind) {
-  switch (kind) {
-    case _PlanSessionKind.recovery:
-    case _PlanSessionKind.rest:
-      return kind;
+_MuscleSuggestion _getMuscleGroupSuggestion(List<WorkoutSession> sessions, DateTime now) {
+  final recentGymSessions = sessions
+      .where((s) => s.type == WorkoutType.gym && s.exercises != null)
+      .toList()
+    ..sort((a, b) => b.date.compareTo(a.date));
+
+  final muscleGroupDays = <MuscleGroup, int>{};
+  for (final session in recentGymSessions) {
+    final daysAgo = now.difference(session.date).inDays;
+    if (daysAgo > 7) break;
+    for (final exercise in session.exercises!) {
+      muscleGroupDays[exercise.muscleGroup] = daysAgo;
+    }
+  }
+
+  MuscleGroup? leastTrained;
+  int maxDays = 0;
+  for (final entry in muscleGroupDays.entries) {
+    if (entry.value > maxDays) {
+      maxDays = entry.value;
+      leastTrained = entry.key;
+    }
+  }
+
+  switch (leastTrained) {
+    case MuscleGroup.chest:
+    case MuscleGroup.shoulders:
+    case MuscleGroup.arms:
+      return const _MuscleSuggestion(
+        name: '上肢推（胸肩手臂）',
+        hint: '胸部、肩部、手臂有一段时间没练了，今天推类训练很合适。',
+      );
+    case MuscleGroup.back:
+      return const _MuscleSuggestion(
+        name: '背部',
+        hint: '背部肌肉最近没怎么练，拉类训练可以帮助改善体态。',
+      );
+    case MuscleGroup.glutesAndLegs:
+      return const _MuscleSuggestion(
+        name: '臀腿',
+        hint: '臀腿是人体最大的肌群，训练收益很高，今天很适合练。',
+      );
     default:
-      return _PlanSessionKind.recovery;
+      return const _MuscleSuggestion(
+        name: '背部',
+        hint: '今天推荐练背部，帮助改善体态和提升力量。',
+      );
   }
+}
+
+class _MuscleSuggestion {
+  final String name;
+  final String hint;
+  const _MuscleSuggestion({required this.name, required this.hint});
 }
 
 bool _isSameDay(DateTime a, DateTime b) {
   return a.year == b.year && a.month == b.month && a.day == b.day;
-}
-
-int _trainingStreakBeforeDate(List<WorkoutSession> sessions, DateTime date) {
-  var streak = 0;
-  var cursor = date.subtract(const Duration(days: 1));
-  while (sessions.any((session) => _isSameDay(session.date, cursor))) {
-    streak++;
-    cursor = cursor.subtract(const Duration(days: 1));
-  }
-  return streak;
-}
-
-_PlanSessionKind _lastGymFocus(List<WorkoutSession> sessions) {
-  for (final session in sessions) {
-    if (session.type != WorkoutType.gym) continue;
-    return _focusFromSession(session) ?? _PlanSessionKind.gymFullBody;
-  }
-  return _PlanSessionKind.gymFullBody;
-}
-
-_PlanSessionKind _nextGymFocus(List<WorkoutSession> sessions, _TrainingGoalType goal) {
-  final cycle = _gymFocusCycle(goal);
-  final recentFocuses = sessions
-      .where((session) => session.type == WorkoutType.gym)
-      .map((session) => _focusFromSession(session))
-      .whereType<_PlanSessionKind>()
-      .take(4)
-      .toList();
-
-  for (final focus in cycle) {
-    if (!recentFocuses.contains(focus)) {
-      return focus;
-    }
-  }
-
-  final last = recentFocuses.isEmpty ? cycle.first : recentFocuses.first;
-  final index = cycle.indexOf(last);
-  if (index == -1) return cycle.first;
-  return cycle[(index + 1) % cycle.length];
-}
-
-List<_PlanSessionKind> _gymFocusCycle(_TrainingGoalType goal) {
-  switch (goal) {
-    case _TrainingGoalType.muscleGain:
-      return const [
-        _PlanSessionKind.gymPull,
-        _PlanSessionKind.gymLower,
-        _PlanSessionKind.gymUpper,
-      ];
-    case _TrainingGoalType.strength:
-      return const [
-        _PlanSessionKind.gymPull,
-        _PlanSessionKind.gymLower,
-        _PlanSessionKind.gymUpper,
-      ];
-    default:
-      return const [
-        _PlanSessionKind.gymPull,
-        _PlanSessionKind.gymLower,
-        _PlanSessionKind.gymUpper,
-      ];
-  }
-}
-
-_PlanSessionKind? _focusFromSession(WorkoutSession session) {
-  if (session.type != WorkoutType.gym) return null;
-  final exercises = session.exercises;
-  if (exercises == null || exercises.isEmpty) return _PlanSessionKind.gymFullBody;
-
-  final counts = <MuscleGroup, int>{};
-  for (final exercise in exercises) {
-    counts[exercise.muscleGroup] = (counts[exercise.muscleGroup] ?? 0) + 1;
-  }
-  final ordered = counts.entries.toList()
-    ..sort((a, b) => b.value.compareTo(a.value));
-  final topGroups = ordered.take(2).map((entry) => entry.key).toSet();
-
-  final hasChestShoulderArm = topGroups.any((group) => {
-        MuscleGroup.chest,
-        MuscleGroup.shoulders,
-        MuscleGroup.arms,
-      }.contains(group));
-  final hasBack = topGroups.contains(MuscleGroup.back);
-  final isLower = topGroups.contains(MuscleGroup.glutesAndLegs);
-  final isCore = topGroups.contains(MuscleGroup.core);
-
-  if (isLower && (hasChestShoulderArm || hasBack || isCore)) {
-    return _PlanSessionKind.gymFullBody;
-  }
-  if (isLower) return _PlanSessionKind.gymLower;
-  if (hasBack && !hasChestShoulderArm) return _PlanSessionKind.gymPull;
-  if (hasChestShoulderArm || isCore) return _PlanSessionKind.gymUpper;
-  return _PlanSessionKind.gymFullBody;
-}
-
-String _gymFocusLabel(_PlanSessionKind kind) {
-  switch (kind) {
-    case _PlanSessionKind.gymUpper:
-      return '胸肩手臂';
-    case _PlanSessionKind.gymLower:
-      return '臀腿';
-    case _PlanSessionKind.gymPull:
-      return '背部';
-    case _PlanSessionKind.gymPush:
-      return '胸肩手臂';
-    case _PlanSessionKind.gymFullBody:
-      return '全身';
-    case _PlanSessionKind.coreMobility:
-      return '拉伸放松';
-    default:
-      return '不同肌群';
-  }
-}
-
-_PlannedDay _mapPlannedDay(
-  DateTime date,
-  _PlanSessionKind kind, {
-  required bool completed,
-}) {
-  final weekday = DateFormat('E', 'zh_CN').format(date);
-  final suffix = completed ? ' 已完成' : '';
-  switch (kind) {
-    case _PlanSessionKind.gymUpper:
-      return _PlannedDay(
-        date: date,
-        kind: kind,
-        title: '$weekday 胸肩手臂$suffix',
-        detail: '卧推或推举做主项，再补侧平举、臂屈伸或弯举，控制总量别堆太杂。',
-        durationLabel: '50-65 分钟',
-        color: AppColors.gymAccent,
-        icon: Icons.fitness_center,
-      );
-    case _PlanSessionKind.gymLower:
-      return _PlannedDay(
-        date: date,
-        kind: kind,
-        title: '$weekday 臀腿训练$suffix',
-        detail: '深蹲、臀桥、罗马尼亚硬拉或腿举里选 1 到 2 个主项，再补腿后侧。',
-        durationLabel: '55-70 分钟',
-        color: AppColors.gymAccent,
-        icon: Icons.sports_gymnastics,
-      );
-    case _PlanSessionKind.gymPush:
-      return _PlannedDay(
-        date: date,
-        kind: kind,
-        title: '$weekday 胸肩手臂$suffix',
-        detail: '胸、肩、手臂为主，动作数量适中，保证主项质量。',
-        durationLabel: '45-60 分钟',
-        color: AppColors.gymAccent,
-        icon: Icons.arrow_upward,
-      );
-    case _PlanSessionKind.gymPull:
-      return _PlannedDay(
-        date: date,
-        kind: kind,
-        title: '$weekday 背部训练$suffix',
-        detail: '下拉、划船、后束和少量二头，重点放在背部发力和动作控制。',
-        durationLabel: '45-60 分钟',
-        color: AppColors.gymAccent,
-        icon: Icons.arrow_downward,
-      );
-    case _PlanSessionKind.gymFullBody:
-      return _PlannedDay(
-        date: date,
-        kind: kind,
-        title: '$weekday 全身训练$suffix',
-        detail: '选择 1 个下肢主项、1 个推、1 个拉，再加核心。',
-        durationLabel: '40-55 分钟',
-        color: AppColors.gymAccent,
-        icon: Icons.accessibility_new,
-      );
-    case _PlanSessionKind.coreMobility:
-      return _PlannedDay(
-        date: date,
-        kind: kind,
-        title: '$weekday 拉伸放松$suffix',
-        detail: '做胸椎、髋、腘绳肌和肩部拉伸，配合泡沫轴或轻松步行，帮助恢复。',
-        durationLabel: '20-30 分钟',
-        color: const Color(0xFF8E8EF8),
-        icon: Icons.self_improvement,
-      );
-    case _PlanSessionKind.cardioSteady:
-      return _PlannedDay(
-        date: date,
-        kind: kind,
-        title: '$weekday 稳态有氧$suffix',
-        detail: '快走、慢跑或骑行，心率保持在可以完整说话的区间。',
-        durationLabel: '35-55 分钟',
-        color: AppColors.cardioAccent,
-        icon: Icons.monitor_heart_outlined,
-      );
-    case _PlanSessionKind.cardioIntervals:
-      return _PlannedDay(
-        date: date,
-        kind: kind,
-        title: '$weekday 间歇课$suffix',
-        detail: '热身后做 4 到 6 组 1:1 间歇，结束做 10 分钟冷身。',
-        durationLabel: '30-40 分钟',
-        color: AppColors.cardioAccent,
-        icon: Icons.speed,
-      );
-    case _PlanSessionKind.swimTechnique:
-      return _PlannedDay(
-        date: date,
-        kind: kind,
-        title: '$weekday 游泳技术课$suffix',
-        detail: '先做打腿、划手和配合练习，再做短距离技术巩固。',
-        durationLabel: '35-50 分钟',
-        color: AppColors.swimAccent,
-        icon: Icons.pool,
-      );
-    case _PlanSessionKind.swimEndurance:
-      return _PlannedDay(
-        date: date,
-        kind: kind,
-        title: '$weekday 游泳耐力课$suffix',
-        detail: '主训练组做中长距离分段，重点把配速拉稳。',
-        durationLabel: '40-60 分钟',
-        color: AppColors.swimAccent,
-        icon: Icons.water,
-      );
-    case _PlanSessionKind.recovery:
-      return _PlannedDay(
-        date: date,
-        kind: kind,
-        title: '$weekday 主动恢复$suffix',
-        detail: '轻松步行、拉伸或泡沫轴，目标是恢复而不是加练。',
-        durationLabel: '15-25 分钟',
-        color: const Color(0xFF34C759),
-        icon: Icons.favorite_outline,
-      );
-    case _PlanSessionKind.rest:
-      return _PlannedDay(
-        date: date,
-        kind: kind,
-        title: '$weekday 休息日$suffix',
-        detail: '完全休息也算计划的一部分，避免把疲劳累积到下一节。',
-        durationLabel: '0 分钟',
-        color: const Color(0xFFB0B7C3),
-        icon: Icons.hotel_outlined,
-      );
-  }
 }
 
 List<_ActionItem> _buildActionItems({
@@ -1146,8 +997,6 @@ List<_ActionItem> _buildActionItems({
 }) {
   final items = <_ActionItem>[];
   final gymCount = weeklySessions.where((item) => item.type == WorkoutType.gym).length;
-  final cardioCount =
-      weeklySessions.where((item) => item.type == WorkoutType.cardio).length;
   final swimCount = weeklySessions.where((item) => item.type == WorkoutType.swim).length;
 
   if (weeklySessions.length < config.trainingDaysPerWeek) {
@@ -1167,9 +1016,9 @@ List<_ActionItem> _buildActionItems({
       items.add(
         _ActionItem(
           title: '保持力量训练不掉线',
-          subtitle: gymCount == 0
-              ? '减脂期仍建议每周至少 2 次力量训练，避免只做有氧。'
-              : '目前力量课已开张，继续把大动作留在周计划里。',
+          subtitle: gymCount >= 3
+              ? '减脂保肌阶段的 3 天力量已达标，继续把动作质量放在第一位。'
+              : '当前力量课不足 3 天，建议补齐胸肩手臂 / 背部 / 臀腿三次力量日。',
           color: AppColors.gymAccent,
           icon: Icons.fitness_center,
         ),
@@ -1206,48 +1055,6 @@ List<_ActionItem> _buildActionItems({
           ),
         );
       }
-      break;
-    case _TrainingGoalType.endurance:
-      final distanceKm = monthlySessions.fold<double>(
-        0,
-        (sum, session) => sum + ((session.totalDistanceMeters ?? 0) / 1000),
-      );
-      items.add(
-        _ActionItem(
-          title: '优先累积低强度总量',
-          subtitle: '本月累计 ${distanceKm.toStringAsFixed(1)} km。耐力目标先做总量，再插入少量间歇。',
-          color: AppColors.cardioAccent,
-          icon: Icons.route,
-        ),
-      );
-      if (cardioCount + swimCount < 2) {
-        items.add(
-          const _ActionItem(
-            title: '有氧频次还不够',
-            subtitle: '每周至少安排 2 次持续心肺训练，否则很难稳定提升耐力底盘。',
-            color: Color(0xFF00B894),
-            icon: Icons.directions_run,
-          ),
-        );
-      }
-      break;
-    case _TrainingGoalType.strength:
-      items.add(
-        _ActionItem(
-          title: '减少无计划的杂项动作',
-          subtitle: '力量目标下，优先做主项和固定辅助动作，别把体能课挤占掉恢复。',
-          color: AppColors.gymAccent,
-          icon: Icons.bolt,
-        ),
-      );
-      items.add(
-        _ActionItem(
-          title: '追踪主项表现',
-          subtitle: '下次训练至少记录一个主项的重量、次数或组数变化，避免只记“练过了”。',
-          color: const Color(0xFF8E8EF8),
-          icon: Icons.bar_chart,
-        ),
-      );
       break;
     case _TrainingGoalType.swimPerformance:
       final swimDistanceKm = monthlySessions
@@ -1304,12 +1111,8 @@ String _goalLabel(_TrainingGoalType goal) {
       return '减脂';
     case _TrainingGoalType.muscleGain:
       return '增肌';
-    case _TrainingGoalType.endurance:
-      return '提升耐力';
-    case _TrainingGoalType.strength:
-      return '提升力量';
     case _TrainingGoalType.swimPerformance:
-      return '游泳专项';
+      return '游泳';
     case _TrainingGoalType.consistency:
       return '养成习惯';
   }
@@ -1428,6 +1231,139 @@ class _SectionTitle extends StatelessWidget {
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: const Color(0xFF6B7280),
               ),
+        ),
+      ],
+    );
+  }
+}
+
+class _WeeklyDirectionCard extends StatelessWidget {
+  final _WeeklyDirectionProgress progress;
+
+  const _WeeklyDirectionCard({required this.progress});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            progress.focusTitle,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1F2937),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            progress.focusSubtitle,
+            style: const TextStyle(
+              color: Color(0xFF4B5563),
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 14),
+          _DirectionProgressRow(
+            label: '力量',
+            done: progress.strengthDone,
+            target: progress.strengthTarget,
+          ),
+          const SizedBox(height: 10),
+          _DirectionProgressRow(
+            label: '游泳/有氧',
+            done: progress.swimCardioDone,
+            target: progress.swimCardioTarget,
+          ),
+          const SizedBox(height: 10),
+          _DirectionProgressRow(
+            label: '拉伸休息',
+            done: progress.recoveryDone,
+            target: progress.recoveryTarget,
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF3FF),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              progress.nextStep,
+              style: const TextStyle(
+                color: Color(0xFF4A5A8A),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DirectionProgressRow extends StatelessWidget {
+  final String label;
+  final int done;
+  final int target;
+
+  const _DirectionProgressRow({
+    required this.label,
+    required this.done,
+    required this.target,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ratio = target <= 0 ? 0.0 : (done / target).clamp(0.0, 1.0);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: Color(0xFF1F2937),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Text(
+              '$done/$target',
+              style: const TextStyle(
+                color: Color(0xFF2563EB),
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            minHeight: 8,
+            value: ratio,
+            backgroundColor: const Color(0xFFE5E7EB),
+            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
+          ),
         ),
       ],
     );
@@ -1640,84 +1576,6 @@ class _SuggestionCard extends StatelessWidget {
   }
 }
 
-class _PlannedDayCard extends StatelessWidget {
-  final _PlannedDay day;
-
-  const _PlannedDayCard({required this.day});
-
-  @override
-  Widget build(BuildContext context) {
-    final dateLabel = DateFormat('M月d日', 'zh_CN').format(day.date);
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: day.color.withValues(alpha: 0.12)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: day.color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(day.icon, color: day.color),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        day.title,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF172033),
-                        ),
-                      ),
-                    ),
-                    Text(
-                      dateLabel,
-                      style: const TextStyle(
-                        color: Color(0xFF6B7280),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  day.detail,
-                  style: const TextStyle(
-                    color: Color(0xFF4B5563),
-                    height: 1.45,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  day.durationLabel,
-                  style: TextStyle(
-                    color: day.color,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _ActionCard extends StatelessWidget {
   final _ActionItem item;
 
@@ -1817,12 +1675,9 @@ class _GoalEditorFields extends StatelessWidget {
         controller: muscleController,
         hint: '例如 28',
       ));
-    } else if (selectedGoal == _TrainingGoalType.endurance ||
-        selectedGoal == _TrainingGoalType.swimPerformance) {
+    } else if (selectedGoal == _TrainingGoalType.swimPerformance) {
       fields.add(_EditorInput(
-        label: selectedGoal == _TrainingGoalType.swimPerformance
-            ? '月游泳目标距离 (km)'
-            : '月耐力目标距离 (km)',
+        label: '月游泳目标距离 (km)',
         controller: distanceController,
         hint: '例如 30',
       ));

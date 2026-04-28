@@ -221,8 +221,7 @@ class _StatsScreenState extends State<StatsScreen>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
+    const tabBlue = Color(0xFF4F46E5);
 
     return Scaffold(
       appBar: AppBar(
@@ -239,15 +238,41 @@ class _StatsScreenState extends State<StatsScreen>
                 ),
           const SizedBox(width: 4),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(50),
-          child: Column(
-            children: [
-              TabBar(
+      ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE9F0F8),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: TabBar(
                 controller: _tabCtrl,
-                labelColor: primary,
-                unselectedLabelColor: theme.textTheme.bodyMedium?.color,
-                indicatorColor: primary,
+                tabAlignment: TabAlignment.fill,
+                indicator: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(13),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0F172A).withValues(alpha: 0.06),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                indicatorSize: TabBarIndicatorSize.tab,
+                indicatorPadding: EdgeInsets.zero,
+                dividerColor: Colors.transparent,
+                labelColor: tabBlue,
+                unselectedLabelColor: const Color(0xFF6B7280),
+                labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                splashFactory: NoSplash.splashFactory,
+                overlayColor: WidgetStateProperty.all(Colors.transparent),
                 tabs: const [
                   Tab(text: '周'),
                   Tab(text: '月'),
@@ -255,17 +280,19 @@ class _StatsScreenState extends State<StatsScreen>
                   Tab(text: '全部'),
                 ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabCtrl,
-        children: [
-          RepaintBoundary(key: _weekKey, child: _StatsPeriodBuilder(currentDate: _currentDate, period: _Period.week, customRange: _dateRange, onMonthTap: () {}, onWeekTap: () => _showPeriodPicker(context), onYearTap: () {})),
-          RepaintBoundary(key: _monthKey, child: _StatsPeriodBuilder(currentDate: _currentDate, period: _Period.month, customRange: _dateRange, onMonthTap: () => _showPeriodPicker(context), onWeekTap: () {}, onYearTap: () {})),
-          RepaintBoundary(key: _yearKey, child: _StatsPeriodBuilder(currentDate: _currentDate, period: _Period.year, customRange: _dateRange, onMonthTap: () {}, onWeekTap: () {}, onYearTap: () => _showPeriodPicker(context))),
-          RepaintBoundary(key: _allKey, child: _StatsPeriodBuilder(currentDate: _currentDate, period: _Period.all, customRange: _dateRange, onMonthTap: () {}, onWeekTap: () {}, onYearTap: () {})),
+          Expanded(
+            child: TabBarView(
+              controller: _tabCtrl,
+              children: [
+                RepaintBoundary(key: _weekKey, child: _StatsPeriodBuilder(currentDate: _currentDate, period: _Period.week, customRange: _dateRange, onMonthTap: () {}, onWeekTap: () => _showPeriodPicker(context), onYearTap: () {})),
+                RepaintBoundary(key: _monthKey, child: _StatsPeriodBuilder(currentDate: _currentDate, period: _Period.month, customRange: _dateRange, onMonthTap: () => _showPeriodPicker(context), onWeekTap: () {}, onYearTap: () {})),
+                RepaintBoundary(key: _yearKey, child: _StatsPeriodBuilder(currentDate: _currentDate, period: _Period.year, customRange: _dateRange, onMonthTap: () {}, onWeekTap: () {}, onYearTap: () => _showPeriodPicker(context))),
+                RepaintBoundary(key: _allKey, child: _StatsPeriodBuilder(currentDate: _currentDate, period: _Period.all, customRange: _dateRange, onMonthTap: () {}, onWeekTap: () {}, onYearTap: () {})),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -273,6 +300,267 @@ class _StatsScreenState extends State<StatsScreen>
 }
 
 enum _Period { week, month, year, all }
+
+/// Percent change vs previous period for counts, minutes, kcal: `+12%`, `-5%`, `—`, or `+100%` when previous is 0.
+String _insightPercentDelta(int current, int previous) {
+  if (previous <= 0) return current > 0 ? '+100%' : '—';
+  final p = ((current - previous) / previous * 100).round();
+  return p >= 0 ? '+$p%' : '$p%';
+}
+
+int _insightPickIndex(int salt, int poolLength) {
+  if (poolLength <= 0) return 0;
+  return salt.abs() % poolLength;
+}
+
+/// Rotating insight lines so the card is not always “sessions + active days”.
+class _RollingInsight {
+  final String icon;
+  final String title;
+  final String description;
+  final String score;
+
+  const _RollingInsight({
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.score,
+  });
+}
+
+_RollingInsight _insightForWeek({
+  required DateTime weekStart,
+  required int sessionCount,
+  required int activeDays,
+  required int totalMins,
+  required int totalCals,
+  required int swimN,
+  required int gymN,
+  required int cardioN,
+  required double swimKm,
+  required int lastSessionCount,
+  required int lastMins,
+  required int lastCals,
+}) {
+  final momS = _insightPercentDelta(sessionCount, lastSessionCount);
+  final momM = _insightPercentDelta(totalMins, lastMins);
+  final momC = _insightPercentDelta(totalCals, lastCals);
+  final pool = <_RollingInsight>[
+    _RollingInsight(
+      icon: '🔥',
+      title: '本周累计 $sessionCount 次',
+      description: '活跃 $activeDays 天',
+      score: momS,
+    ),
+    if (totalMins > 0)
+      _RollingInsight(
+        icon: '⏱️',
+        title: '本周训练 $totalMins 分钟',
+        description: '约 ${(totalMins / 60).toStringAsFixed(1)} 小时\n时长环比 $momM',
+        score: momM,
+      ),
+    if (totalCals > 0)
+      _RollingInsight(
+        icon: '📊',
+        title: '本周约 $totalCals kcal',
+        description: '估算消耗 · 热量环比 $momC',
+        score: momC,
+      ),
+    if (swimN + gymN + cardioN > 0)
+      _RollingInsight(
+        icon: '🎯',
+        title: '游 $swimN · 力量 $gymN · 有氧 $cardioN',
+        description: '按次数 · 次数环比 $momS',
+        score: momS,
+      ),
+    if (swimKm >= 0.05)
+      _RollingInsight(
+        icon: '🏊',
+        title: '游泳约 ${swimKm.toStringAsFixed(1)} km',
+        description: '下水 $swimN 次 · 环比 $momS',
+        score: momS,
+      ),
+  ];
+  final i = _insightPickIndex(
+    weekStart.day + weekStart.month * 31 + sessionCount * 3,
+    pool.length,
+  );
+  return pool[i];
+}
+
+_RollingInsight _insightForMonth({
+  required int year,
+  required int month,
+  required int sessionCount,
+  required int activeDays,
+  required int totalMins,
+  required int totalCals,
+  required int swimN,
+  required int gymN,
+  required int cardioN,
+  required double swimKm,
+  required int lastSessionCount,
+  required int lastMins,
+  required int lastCals,
+}) {
+  final momS = _insightPercentDelta(sessionCount, lastSessionCount);
+  final momM = _insightPercentDelta(totalMins, lastMins);
+  final momC = _insightPercentDelta(totalCals, lastCals);
+  final pool = <_RollingInsight>[
+    _RollingInsight(
+      icon: '🏆',
+      title: '本月累计 $sessionCount 次',
+      description: '活跃 $activeDays 天',
+      score: momS,
+    ),
+    if (totalMins > 0)
+      _RollingInsight(
+        icon: '⏱️',
+        title: '本月训练 $totalMins 分钟',
+        description: '约 ${(totalMins / 60).toStringAsFixed(1)} 小时\n时长环比 $momM',
+        score: momM,
+      ),
+    if (totalCals > 0)
+      _RollingInsight(
+        icon: '📊',
+        title: '本月约 $totalCals kcal',
+        description: '估算消耗 · 热量环比 $momC',
+        score: momC,
+      ),
+    if (swimN + gymN + cardioN > 0)
+      _RollingInsight(
+        icon: '🎯',
+        title: '游 $swimN · 力量 $gymN · 有氧 $cardioN',
+        description: '次数结构 · 环比 $momS',
+        score: momS,
+      ),
+    if (swimKm >= 0.05)
+      _RollingInsight(
+        icon: '🏊',
+        title: '游泳约 ${swimKm.toStringAsFixed(1)} km',
+        description: '下水 $swimN 次 · 环比 $momS',
+        score: momS,
+      ),
+  ];
+  final i = _insightPickIndex(year * 12 + month + sessionCount * 5, pool.length);
+  return pool[i];
+}
+
+_RollingInsight _insightForYear({
+  required int year,
+  required int sessionCount,
+  required int activeMonths,
+  required int totalMins,
+  required int totalCals,
+  required int swimN,
+  required int gymN,
+  required int cardioN,
+  required double swimKm,
+  required int lastSessionCount,
+  required int lastMins,
+  required int lastCals,
+}) {
+  final momS = _insightPercentDelta(sessionCount, lastSessionCount);
+  final momM = _insightPercentDelta(totalMins, lastMins);
+  final momC = _insightPercentDelta(totalCals, lastCals);
+  final pool = <_RollingInsight>[
+    _RollingInsight(
+      icon: '📈',
+      title: '$year 年累计 $sessionCount 次',
+      description: '活跃 $activeMonths 个月',
+      score: momS,
+    ),
+    if (totalMins > 0)
+      _RollingInsight(
+        icon: '⏱️',
+        title: '$year 年训练 $totalMins 分钟',
+        description: '约 ${(totalMins / 60).toStringAsFixed(0)} 小时\n时长同比 $momM',
+        score: momM,
+      ),
+    if (totalCals > 0)
+      _RollingInsight(
+        icon: '📊',
+        title: '$year 年约 $totalCals kcal',
+        description: '估算消耗 · 热量同比 $momC',
+        score: momC,
+      ),
+    if (swimN + gymN + cardioN > 0)
+      _RollingInsight(
+        icon: '🎯',
+        title: '游 $swimN · 力量 $gymN · 有氧 $cardioN',
+        description: '全年次数 · 同比 $momS',
+        score: momS,
+      ),
+    if (swimKm >= 0.05)
+      _RollingInsight(
+        icon: '🏊',
+        title: '全年游泳 ${(swimKm).toStringAsFixed(1)} km',
+        description: '下水 $swimN 次 · 同比 $momS',
+        score: momS,
+      ),
+  ];
+  final i = _insightPickIndex(year * 7 + sessionCount, pool.length);
+  return pool[i];
+}
+
+_RollingInsight _insightForAllTime({
+  required int sessionCount,
+  required int activeDays,
+  required int longestStreak,
+  required int totalMins,
+  required int totalCals,
+  required int swimN,
+  required int gymN,
+  required int cardioN,
+  required double swimKm,
+  required int sportMonths,
+}) {
+  final pool = <_RollingInsight>[
+    _RollingInsight(
+      icon: '💎',
+      title: '累计 $sessionCount 次',
+      description: '活跃 $activeDays 天\n最长连续 $longestStreak 天',
+      score: '$sessionCount次',
+    ),
+    if (totalMins > 0)
+      _RollingInsight(
+        icon: '⏱️',
+        title: '总训练 $totalMins 分钟',
+        description: '约 ${(totalMins / 60).toStringAsFixed(0)} 小时 · 跨度 $sportMonths 个月',
+        score: '${totalMins ~/ 60}h',
+      ),
+    if (totalCals > 0)
+      _RollingInsight(
+        icon: '📊',
+        title: '累计约 $totalCals kcal',
+        description: '估算消耗 · 全程记录',
+        score: _formatThousands(totalCals),
+      ),
+    if (swimN + gymN + cardioN > 0)
+      _RollingInsight(
+        icon: '🎯',
+        title: '游 $swimN · 力量 $gymN · 有氧 $cardioN',
+        description: '按次数统计的分布',
+        score: '$sessionCount次',
+      ),
+    if (swimKm >= 0.05)
+      _RollingInsight(
+        icon: '🏊',
+        title: '游泳共 ${swimKm.toStringAsFixed(1)} km',
+        description: '下水 $swimN 次',
+        score: '$swimN次',
+      ),
+  ];
+  final i = _insightPickIndex(activeDays * 11 + sessionCount + sportMonths, pool.length);
+  return pool[i];
+}
+
+/// Compact kcal for score column (no comma for consistency with rest of stats UI).
+String _formatThousands(int n) {
+  if (n < 1000) return '$n';
+  if (n < 1000000) return '${(n / 1000).toStringAsFixed(1)}k';
+  return '${(n / 1000000).toStringAsFixed(1)}M';
+}
 
 (DateTime, DateTime) _range(DateTime now, _Period period) {
   switch (period) {
@@ -375,18 +663,29 @@ class _MonthStatsView extends StatelessWidget {
             0, (sum, s) => sum + (s.exercises?.fold<int>(0, (s2, e) => s2 + e.sets.length) ?? 0));
         final lastMonthCardioMins =
             lastMonthCardio.fold<int>(0, (sum, s) => sum + (s.durationMinutes ?? s.durationSeconds ~/ 60));
+        final lastMonthTotalMins = provider.getTotalDurationForPeriod(prevMonthStart, prevMonthEnd) ~/ 60;
+        final lastMonthTotalCals =
+            lastMonthSessions.fold<int>(0, (sum, s) => sum + (s.calories ?? 0));
+        final monthInsight = _insightForMonth(
+          year: start.year,
+          month: start.month,
+          sessionCount: sessions.length,
+          activeDays: activeDays,
+          totalMins: totalMins,
+          totalCals: totalCals,
+          swimN: swimSessions.length,
+          gymN: gymSessions.length,
+          cardioN: cardioSessions.length,
+          swimKm: swimDist / 1000,
+          lastSessionCount: lastMonthSessions.length,
+          lastMins: lastMonthTotalMins,
+          lastCals: lastMonthTotalCals,
+        );
 
         String formatIncrement(double current, double last, String unit) {
           final diff = current - last;
           if (diff >= 0) return '+${diff.toStringAsFixed(1)}$unit';
           return '${diff.toStringAsFixed(1)}$unit';
-        }
-
-        String momSessionPct() {
-          final prev = lastMonthSessions.length;
-          if (prev <= 0) return sessions.isNotEmpty ? '+100%' : '—';
-          final p = ((sessions.length - prev) / prev * 100).round();
-          return p >= 0 ? '+$p%' : '$p%';
         }
 
         return SingleChildScrollView(
@@ -403,10 +702,10 @@ class _MonthStatsView extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               _InsightCardNew(
-                icon: '🏆',
-                title: '本月累计 ${sessions.length} 次训练',
-                description: '活跃 $activeDays 天。对比上月详见下方关键指标。',
-                score: momSessionPct(),
+                icon: monthInsight.icon,
+                title: monthInsight.title,
+                description: monthInsight.description,
+                score: monthInsight.score,
               ),
               Padding(
                 padding: const EdgeInsets.only(top: 20, left: 2, right: 2, bottom: 12),
@@ -574,6 +873,28 @@ class _WeekStatsView extends StatelessWidget {
         final lastWeekGymSets = lastWeekGymSessions.fold<int>(0, (sum, s) => sum + (s.exercises?.fold<int>(0, (s2, e) => s2 + e.sets.length) ?? 0));
         final lastWeekCardioMins = lastWeekCardioSessions.fold<int>(0, (sum, s) => sum + (s.durationMinutes ?? s.durationSeconds ~/ 60));
 
+        final weekActiveDays = sessions
+            .map((s) => DateTime(s.date.year, s.date.month, s.date.day))
+            .toSet()
+            .length;
+        final lastWeekTotalMins = provider.getTotalDurationForPeriod(lastWeekStart, lastWeekEnd) ~/ 60;
+        final lastWeekTotalCals =
+            lastWeekSessions.fold<int>(0, (sum, s) => sum + (s.calories ?? 0));
+        final weekInsight = _insightForWeek(
+          weekStart: start,
+          sessionCount: sessions.length,
+          activeDays: weekActiveDays,
+          totalMins: totalMins,
+          totalCals: totalCals,
+          swimN: swimSessions.length,
+          gymN: gymSessions.length,
+          cardioN: cardioSessions.length,
+          swimKm: swimDist / 1000,
+          lastSessionCount: lastWeekSessions.length,
+          lastMins: lastWeekTotalMins,
+          lastCals: lastWeekTotalCals,
+        );
+
         // 计算增量
         String formatIncrement(double current, double last, String unit) {
           final diff = current - last;
@@ -603,10 +924,10 @@ class _WeekStatsView extends StatelessWidget {
               //  洞察卡片
               // ═══════════════════════════════════════════
               _InsightCardNew(
-                icon: '🔥',
-                title: '连续 4 天有运动记录',
-                description: '距离"连续一周"成就还差 3 天，建议明天安排一次轻量有氧。',
-                score: '+18%',
+                icon: weekInsight.icon,
+                title: weekInsight.title,
+                description: weekInsight.description,
+                score: weekInsight.score,
               ),
 
               // ═══════════════════════════════════════════
@@ -750,18 +1071,28 @@ class _YearStatsView extends StatelessWidget {
             0, (sum, s) => sum + (s.exercises?.fold<int>(0, (s2, e) => s2 + e.sets.length) ?? 0));
         final lastYearCardioMins =
             lastYearCardio.fold<int>(0, (sum, s) => sum + (s.durationMinutes ?? s.durationSeconds ~/ 60));
+        final lastYearTotalMins = provider.getTotalDurationForPeriod(prevYearStart, prevYearEnd) ~/ 60;
+        final lastYearTotalCals =
+            lastYearSessions.fold<int>(0, (sum, s) => sum + (s.calories ?? 0));
+        final yearInsight = _insightForYear(
+          year: start.year,
+          sessionCount: sessions.length,
+          activeMonths: activeMonths.length,
+          totalMins: totalMins,
+          totalCals: totalCals,
+          swimN: swimSessions.length,
+          gymN: gymSessions.length,
+          cardioN: cardioSessions.length,
+          swimKm: swimDist / 1000,
+          lastSessionCount: lastYearSessions.length,
+          lastMins: lastYearTotalMins,
+          lastCals: lastYearTotalCals,
+        );
 
         String formatIncrement(double current, double last, String unit) {
           final diff = current - last;
           if (diff >= 0) return '+${diff.toStringAsFixed(1)}$unit';
           return '${diff.toStringAsFixed(1)}$unit';
-        }
-
-        String yoySessionPct() {
-          final prev = lastYearSessions.length;
-          if (prev <= 0) return sessions.isNotEmpty ? '+100%' : '—';
-          final p = ((sessions.length - prev) / prev * 100).round();
-          return p >= 0 ? '+$p%' : '$p%';
         }
 
         return SingleChildScrollView(
@@ -778,11 +1109,10 @@ class _YearStatsView extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               _InsightCardNew(
-                icon: '📈',
-                title: '${start.year}年累计 ${sessions.length} 次训练',
-                description:
-                    '活跃 ${activeMonths.length} 个月 · ${cardioMins ~/ 60} 小时有氧。对比去年见下方关键指标。',
-                score: yoySessionPct(),
+                icon: yearInsight.icon,
+                title: yearInsight.title,
+                description: yearInsight.description,
+                score: yearInsight.score,
               ),
               Padding(
                 padding: const EdgeInsets.only(top: 20, left: 2, right: 2, bottom: 12),
@@ -1789,6 +2119,18 @@ class _DefaultStatsView extends StatelessWidget {
 
         final theme = Theme.of(context);
         final cardioHoursStr = (cardioMins / 60).toStringAsFixed(1);
+        final allInsight = _insightForAllTime(
+          sessionCount: sessions.length,
+          activeDays: activeDays,
+          longestStreak: longestStreak,
+          totalMins: totalMins,
+          totalCals: totalCals,
+          swimN: swimSessions.length,
+          gymN: gymSessions.length,
+          cardioN: cardioSessions.length,
+          swimKm: swimDist / 1000,
+          sportMonths: totalMonths,
+        );
 
         return ListView(
           padding: const EdgeInsets.fromLTRB(20, 10, 20, 110),
@@ -1800,10 +2142,10 @@ class _DefaultStatsView extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             _InsightCardNew(
-              icon: '💎',
-              title: '累计完成 ${sessions.length} 次训练',
-              description: '活跃 $activeDays 天 · 最长连续 $longestStreak 天 · 总时长 $totalMins 分钟。',
-              score: '${sessions.length}次',
+              icon: allInsight.icon,
+              title: allInsight.title,
+              description: allInsight.description,
+              score: allInsight.score,
             ),
             const SizedBox(height: 16),
             Container(
@@ -3080,40 +3422,20 @@ class _AllTimeHeroCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Expanded(
-                child: Text(
-                  '全部记录',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.03,
-                    height: 1.2,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.26)),
-                ),
-                child: const Text(
-                  '全部时间',
-                  style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
-                ),
-              ),
-            ],
+          const Text(
+            '全部记录',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.03,
+              height: 1.2,
+            ),
           ),
           const SizedBox(height: 20),
           Row(
             children: [
-              Expanded(child: _HeroMetricNew(value: '$sportMonths', label: '我已运动 · 月')),
+              Expanded(child: _HeroMetricNew(value: '$sportMonths', label: '已运动 · 月')),
               const SizedBox(width: 12),
               Expanded(child: _HeroMetricNew(value: '$activeDays', label: '已坚持 · 天')),
               const SizedBox(width: 12),
@@ -3320,6 +3642,8 @@ class _InsightCardNew extends StatelessWidget {
               children: [
                 Text(
                   title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -3328,6 +3652,8 @@ class _InsightCardNew extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   description,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 13,
                     color: Color(0xFF6B7280),
