@@ -574,7 +574,7 @@ class _BodyMetricsScreenState extends State<BodyMetricsScreen> {
                                         await provider.updateRecord(updated);
                                       }
 
-                                      if (mounted) {
+                                      if (mounted && Navigator.canPop(sheetContext)) {
                                         Navigator.pop(sheetContext);
                                       }
                                     },

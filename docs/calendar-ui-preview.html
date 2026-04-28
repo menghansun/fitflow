@@ -1,0 +1,791 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FitFlow 日历页交互预览</title>
+  <style>
+    :root {
+      --bg: #f0f4f8;
+      --card: #ffffff;
+      --text: #1a2332;
+      --muted: #8896a8;
+      --line: #e4ecf4;
+      --sky: #00d4ff;
+      --orange: #ff6b35;
+      --green: #34d399;
+      --yellow: #f59e0b;
+      --red: #f43f5e;
+      --blue: #3b82f6;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "SF Pro Display", "PingFang SC", "Microsoft YaHei", sans-serif;
+      display: grid;
+      place-items: start center;
+      padding: 24px 16px 120px;
+    }
+
+    .phone {
+      width: min(400px, 100%);
+      background: var(--bg);
+      min-height: 900px;
+    }
+
+    /* ── 顶部导航 ── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 4px 12px;
+    }
+
+    .topbar h1 {
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: -.03em;
+    }
+
+    .topbar-add {
+      width: 38px; height: 38px;
+      border-radius: 12px;
+      border: 0;
+      background: var(--sky);
+      color: #fff;
+      font-size: 22px;
+      font-weight: 400;
+      display: grid; place-items: center;
+      box-shadow: 0 4px 12px rgba(0, 212, 255, .3);
+      cursor: pointer;
+    }
+
+    /* ── Hero 月度概览 ── */
+    .month-hero {
+      border-radius: 24px;
+      padding: 20px 20px 16px;
+      background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 55%, #0ea5e9 100%);
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 12px 32px rgba(59, 130, 246, .3);
+      margin-bottom: 12px;
+    }
+
+    .mh-glow {
+      position: absolute;
+      width: 180px; height: 180px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.1);
+      right: -50px; top: -70px;
+      pointer-events: none;
+    }
+
+    .mh-glow2 {
+      position: absolute;
+      width: 90px; height: 90px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      right: 20px; bottom: -30px;
+      pointer-events: none;
+    }
+
+    .mh-content > * { position: relative; z-index: 1; }
+
+    .mh-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .mh-nav {
+      display: flex;
+      gap: 6px;
+    }
+
+    .mh-nav button {
+      width: 30px; height: 30px;
+      border: 0; border-radius: 9px;
+      background: rgba(255,255,255,.15);
+      color: rgba(255,255,255,.75);
+      font-size: 15px;
+      cursor: pointer;
+      display: grid; place-items: center;
+      transition: background .12s;
+    }
+    .mh-nav button:active { background: rgba(255,255,255,.25); }
+
+    .mh-month {
+      color: #fff;
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: -.01em;
+      cursor: pointer;
+    }
+
+    .mh-streak {
+      font-size: 11px;
+      color: rgba(255,255,255,.5);
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    .mh-dots {
+      display: flex;
+      gap: 3px;
+      align-items: center;
+      align-self: flex-start;
+    }
+
+    .mh-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.25);
+    }
+    .mh-dot.on { background: #fff; width: 18px; border-radius: 3px; }
+
+    /* 月度三指标 */
+    .mh-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .mh-stat {
+      background: rgba(255,255,255,.14);
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 16px;
+      padding: 10px 6px 9px;
+      text-align: center;
+    }
+
+    .mh-stat-icon { font-size: 16px; margin-bottom: 3px; }
+
+    .mh-stat strong {
+      display: block;
+      color: #fff;
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: -.03em;
+      line-height: 1;
+    }
+
+    .mh-stat span {
+      display: block;
+      color: rgba(255,255,255,.5);
+      font-size: 10px;
+      font-weight: 700;
+      margin-top: 3px;
+      letter-spacing: .02em;
+    }
+
+    /* ── 日历卡片 ── */
+    .cal-card {
+      background: var(--card);
+      border-radius: 22px;
+      padding: 16px 12px 14px;
+      box-shadow: 0 4px 20px rgba(15, 23, 42, .06);
+      border: 1px solid rgba(255,255,255,.8);
+      margin-bottom: 12px;
+    }
+
+    .weekday-row {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      margin-bottom: 6px;
+    }
+
+    .wd-label {
+      text-align: center;
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--muted);
+      padding: 4px 0;
+      letter-spacing: .02em;
+    }
+    .wd-label.red { color: #f43f5e; }
+
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 3px;
+    }
+
+    .day-cell {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 5px 2px 4px;
+      border-radius: 12px;
+      cursor: pointer;
+      min-height: 54px;
+      transition: background .12s;
+    }
+    .day-cell:hover { background: #f1f5f9; }
+    .day-cell:active { transform: scale(.96); }
+    .day-cell.empty { visibility: hidden; pointer-events: none; }
+
+    .day-num {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1;
+      margin-bottom: 3px;
+      width: 24px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      transition: all .12s;
+    }
+
+    .day-cell.today .day-num {
+      color: var(--blue);
+      font-weight: 900;
+    }
+
+    .day-cell.selected .day-num {
+      background: var(--sky);
+      color: #fff;
+      font-weight: 900;
+    }
+
+    .day-tags {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5px;
+      width: 100%;
+    }
+
+    .day-tag {
+      width: 100%;
+      border-radius: 3px;
+      padding: 1px 2px;
+      text-align: center;
+      font-size: 7.5px;
+      font-weight: 800;
+      line-height: 1.35;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      letter-spacing: .01em;
+    }
+
+    .day-tag.mins  { background: rgba(245,158,11,.15); color: #b45309; }
+    .day-tag.cals  { background: rgba(244,63,94,.15);  color: #e11d48; }
+    .day-tag.swim  { background: rgba(0,212,255,.15);  color: #0284c7; }
+    .day-tag.gym   { background: rgba(255,107,53,.15); color: #c2410c; }
+    .day-tag.cardio{ background: rgba(52,211,153,.15); color: #059669; }
+
+    .day-more {
+      font-size: 7.5px;
+      color: var(--muted);
+      font-weight: 700;
+      text-align: center;
+    }
+
+    /* 日历底部图例 */
+    .cal-legend {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--line);
+      flex-wrap: wrap;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 10.5px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .legend-dot {
+      width: 7px; height: 7px;
+      border-radius: 3px;
+    }
+
+    /* ── 选中日详情卡片 ── */
+    .detail-card {
+      background: var(--card);
+      border-radius: 22px;
+      padding: 18px 16px;
+      box-shadow: 0 4px 20px rgba(15, 23, 42, .06);
+      border: 1px solid rgba(255,255,255,.8);
+    }
+
+    .detail-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .detail-date {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .detail-date strong {
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: -.03em;
+    }
+
+    .detail-date span {
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .detail-badge {
+      background: rgba(0,212,255,.1);
+      color: #0284c7;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+
+    .detail-summary {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .detail-sum-item {
+      background: #f8fafc;
+      border-radius: 14px;
+      padding: 10px 6px;
+      text-align: center;
+      border: 1px solid var(--line);
+    }
+
+    .detail-sum-item b {
+      display: block;
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: -.02em;
+      color: var(--text);
+    }
+
+    .detail-sum-item small {
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+
+    .session-list { display: flex; flex-direction: column; gap: 7px; }
+
+    .session-item {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 11px 12px;
+      background: #f8fafc;
+      border-radius: 15px;
+      border: 1px solid var(--line);
+      cursor: pointer;
+      transition: transform .12s, box-shadow .12s;
+    }
+    .session-item:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(15,23,42,.07);
+    }
+
+    .sess-icon {
+      width: 42px; height: 42px;
+      border-radius: 12px;
+      display: grid; place-items: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .sess-icon.swim  { background: rgba(0,212,255,.15); }
+    .sess-icon.gym   { background: rgba(255,107,53,.15); }
+    .sess-icon.cardio{ background: rgba(52,211,153,.15); }
+
+    .sess-info { flex: 1; min-width: 0; }
+    .sess-info strong {
+      display: block;
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sess-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .sess-meta span {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .sess-arrow { color: #c8d0dc; font-size: 18px; }
+
+    /* 无记录 */
+    .empty-day {
+      text-align: center;
+      padding: 24px 0 16px;
+    }
+    .empty-day .emoji { font-size: 38px; margin-bottom: 8px; }
+    .empty-day p { color: var(--muted); font-size: 14px; font-weight: 600; }
+    .empty-day small { display: block; color: #aab4c0; font-size: 12px; margin-top: 4px; }
+
+    /* Month sheet */
+    .sheet-backdrop {
+      position: fixed; inset: 0; z-index: 20;
+      display: none;
+      align-items: flex-end;
+      background: rgba(15,23,42,.25);
+      backdrop-filter: blur(3px);
+    }
+    .sheet-backdrop.show { display: flex; }
+
+    .sheet {
+      width: 100%;
+      background: #fff;
+      border-radius: 28px 28px 0 0;
+      padding: 14px 20px 32px;
+      box-shadow: 0 -16px 40px rgba(15,23,42,.15);
+    }
+
+    .sheet-grabber {
+      width: 38px; height: 4px;
+      border-radius: 999px;
+      background: #dde4ef;
+      margin: 0 auto 16px;
+    }
+
+    .sheet-title {
+      text-align: center;
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: -.01em;
+      margin-bottom: 16px;
+    }
+
+    .month-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .month-gi {
+      aspect-ratio: 2;
+      border: 2px solid var(--line);
+      background: #fff;
+      border-radius: 14px;
+      display: grid; place-items: center;
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--text);
+      cursor: pointer;
+      transition: all .12s;
+    }
+    .month-gi:active { transform: scale(.95); }
+    .month-gi.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      left: 50%; bottom: 100px;
+      transform: translateX(-50%) translateY(10px);
+      padding: 10px 16px;
+      border-radius: 999px;
+      color: #fff;
+      background: rgba(15,23,42,.88);
+      font-size: 13px; font-weight: 700;
+      opacity: 0; pointer-events: none;
+      transition: opacity .18s, transform .18s;
+      z-index: 30;
+      white-space: nowrap;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+  <div class="phone">
+    <!-- 顶部导航 -->
+    <div class="topbar" style="padding: 8px 16px 12px;">
+      <h1>运动日历</h1>
+      <button class="topbar-add" id="addBtn">+</button>
+    </div>
+
+    <div style="padding: 0 16px;">
+      <!-- Hero 月度概览 -->
+      <div class="month-hero">
+        <div class="mh-glow"></div>
+        <div class="mh-glow2"></div>
+        <div class="mh-content">
+          <div class="mh-header">
+            <div>
+              <div class="mh-nav">
+                <button id="prevM">&lt;</button>
+                <button id="nextM">&gt;</button>
+              </div>
+            </div>
+            <div style="text-align:center">
+              <div class="mh-month" id="heroMonth">2026年4月</div>
+              <div class="mh-streak" id="heroStreak">已连续运动 12 天</div>
+            </div>
+            <div class="mh-dots">
+              <div class="mh-dot"></div>
+              <div class="mh-dot"></div>
+              <div class="mh-dot on"></div>
+              <div class="mh-dot"></div>
+            </div>
+          </div>
+          <div class="mh-stats">
+            <div class="mh-stat">
+              <div class="mh-stat-icon">💪</div>
+              <strong id="heroDays">18</strong>
+              <span>训练天数</span>
+            </div>
+            <div class="mh-stat">
+              <div class="mh-stat-icon">⏱</div>
+              <strong id="heroMins">1,128</strong>
+              <span>总分钟</span>
+            </div>
+            <div class="mh-stat">
+              <div class="mh-stat-icon">🔥</div>
+              <strong id="heroCals">7,420</strong>
+              <span>千卡</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 日历卡片 -->
+      <div class="cal-card">
+        <div class="weekday-row">
+          <div class="wd-label red">一</div>
+          <div class="wd-label">二</div>
+          <div class="wd-label">三</div>
+          <div class="wd-label">四</div>
+          <div class="wd-label">五</div>
+          <div class="wd-label red">六</div>
+          <div class="wd-label red">日</div>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+        <div class="cal-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>分钟</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#f43f5e"></div>千卡</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#00d4ff"></div>游泳</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#ff6b35"></div>健身</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#34d399"></div>有氧</div>
+        </div>
+      </div>
+
+      <!-- 选中日详情 -->
+      <div class="detail-card">
+        <div class="detail-header">
+          <div class="detail-date">
+            <strong id="detailDate">4月26日</strong>
+            <span id="detailWeek">周日</span>
+          </div>
+          <div class="detail-badge" id="detailBadge">3 条记录</div>
+        </div>
+        <div class="detail-summary">
+          <div class="detail-sum-item"><b id="detailMins">48</b><small>分钟</small></div>
+          <div class="detail-sum-item"><b id="detailCals">320</b><small>千卡</small></div>
+          <div class="detail-sum-item"><b id="detailTypes">2</b><small>类型</small></div>
+        </div>
+        <div class="session-list" id="sessList"></div>
+        <div class="empty-day" id="emptyDay" style="display:none">
+          <div class="emoji">📅</div>
+          <p>这天没有运动记录</p>
+          <small>点击上方 + 添加</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast">已切换到 4 月</div>
+
+    <!-- 月份选择器 -->
+    <div class="sheet-backdrop" id="monthSheet">
+      <div class="sheet">
+        <div class="sheet-grabber"></div>
+        <div class="sheet-title">选择月份</div>
+        <div class="month-grid" id="monthGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = id => document.getElementById(id);
+
+    const monthData = {
+      year: 2026, month: 4,
+      startWeekday: 3,
+      days: 30,
+      dayTypes: {
+        2:['swim'], 4:['gym'], 6:['cardio'], 8:['swim'],
+        10:['swim','gym'], 11:['gym'], 13:['swim','cardio'], 15:['gym'],
+        17:['swim'], 18:['gym'], 20:['swim','gym'], 22:['cardio'],
+        24:['swim'], 25:['gym'], 26:['swim','gym','cardio'],
+        27:['swim'], 28:['gym'], 29:['swim'],
+      },
+      dayDetails: {
+        2:{m:40,c:200}, 4:{m:60,c:140}, 6:{m:30,c:180}, 8:{m:45,c:220},
+        10:{m:90,c:320}, 11:{m:55,c:130}, 13:{m:70,c:350}, 15:{m:50,c:120},
+        17:{m:38,c:190}, 18:{m:65,c:150}, 20:{m:75,c:280}, 22:{m:25,c:160},
+        24:{m:40,c:200}, 25:{m:58,c:135}, 26:{m:48,c:320},
+        27:{m:42,c:210}, 28:{m:60,c:140}, 29:{m:35,c:175},
+      },
+      monthStats: {days:18, mins:1128, cals:7420}
+    };
+
+    const typeName = {swim:'游泳', gym:'健身', cardio:'有氧'};
+    const sessionIcons = {swim:'🏊', gym:'💪', cardio:'❤️'};
+    const weekDay = ['','周一','周二','周三','周四','周五','周六','周日'];
+    const monthNames = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+    let selectedDay = 26;
+
+    function renderCal() {
+      const grid = $('calGrid');
+      const lead = monthData.startWeekday - 1;
+      const total = Math.ceil((lead + monthData.days) / 7) * 7;
+      let html = '';
+
+      for (let i = 0; i < total; i++) {
+        const day = i - lead + 1;
+        if (day < 1 || day > monthData.days) {
+          html += `<div class="day-cell empty"></div>`;
+          continue;
+        }
+
+        const types = monthData.dayTypes[day] || [];
+        const det   = monthData.dayDetails[day];
+        const isToday  = day === 26;
+        const isSelect = day === selectedDay;
+
+        let tags = '';
+        if (types.length > 0 && det) {
+          tags = `<div class="day-tags">`;
+          if (det.m) tags += `<div class="day-tag mins">${det.m}分钟</div>`;
+          if (det.c) tags += `<div class="day-tag cals">${det.c}千卡</div>`;
+          const t = types[0];
+          tags += `<div class="day-tag ${t}">${typeName[t]}</div>`;
+          if (types.length > 1) tags += `<div class="day-more">+${types.length-1}</div>`;
+          tags += `</div>`;
+        }
+
+        html += `<div class="day-cell${isToday?' today':''}${isSelect?' selected':''}" data-day="${day}">
+          <span class="day-num">${day}</span>
+          ${tags}
+        </div>`;
+      }
+      grid.innerHTML = html;
+
+      grid.querySelectorAll('.day-cell:not(.empty)').forEach(c => {
+        c.addEventListener('click', () => {
+          selectedDay = Number(c.dataset.day);
+          renderCal();
+          renderDetail();
+        });
+      });
+    }
+
+    function renderDetail() {
+      const det = monthData.dayDetails[selectedDay];
+      const types = monthData.dayTypes[selectedDay] || [];
+      const wday = weekDay[new Date(2026, 3, selectedDay).getDay()];
+
+      $('detailDate').textContent  = `4月${selectedDay}日`;
+      $('detailWeek').textContent  = wday;
+
+      if (types.length === 0) {
+        $('detailBadge').style.display = 'none';
+        $('sessList').innerHTML = '';
+        $('emptyDay').style.display = 'block';
+        $('detailMins').textContent = '-';
+        $('detailCals').textContent = '-';
+        $('detailTypes').textContent = '-';
+        return;
+      }
+
+      $('detailBadge').style.display = '';
+      $('detailBadge').textContent = `${types.length} 条记录`;
+      $('emptyDay').style.display = 'none';
+      $('detailMins').textContent  = det ? det.m  : '-';
+      $('detailCals').textContent   = det ? det.c  : '-';
+      $('detailTypes').textContent  = new Set(types).size;
+
+      const sessions = [
+        {type:'swim', label:'自由泳 40分钟', time:'08:30', m:40, c:200},
+        {type:'gym',  label:'胸肌&amp;背肌', time:'15:00', m:45, c:90},
+        {type:'cardio',label:'跑步 5km',    time:'19:00', m:25, c:50},
+      ];
+
+      $('sessList').innerHTML = sessions.slice(0, types.length).map(s => `
+        <div class="session-item">
+          <div class="sess-icon ${s.type}">${sessionIcons[s.type]}</div>
+          <div class="sess-info">
+            <strong>${s.label}</strong>
+            <div class="sess-meta">
+              <span>🕐 ${s.time}</span>
+              <span>⏱ ${s.m}分钟</span>
+              <span>🔥 ${s.c}千卡</span>
+            </div>
+          </div>
+          <div class="sess-arrow">›</div>
+        </div>`).join('');
+    }
+
+    function renderSheet() {
+      const g = $('monthGrid');
+      g.innerHTML = monthNames.map((m,i) =>
+        `<div class="month-gi${i===3?' active':''}" data-m="${i+1}">${m}</div>`
+      ).join('');
+      g.querySelectorAll('.month-gi').forEach(it => {
+        it.addEventListener('click', () => {
+          g.querySelectorAll('.month-gi').forEach(x => x.classList.remove('active'));
+          it.classList.add('active');
+          closeSheet();
+          showToast(`已切换到 ${it.dataset.m} 月`);
+        });
+      });
+    }
+
+    function openSheet()  { $('monthSheet').classList.add('show'); }
+    function closeSheet() { $('monthSheet').classList.remove('show'); }
+
+    $('monthSheet').addEventListener('click', e => { if(e.target.id==='monthSheet') closeSheet(); });
+    $('heroMonth').addEventListener('click', openSheet);
+    $('prevM').addEventListener('click', () => showToast('已切换到上一月'));
+    $('nextM').addEventListener('click', () => showToast('已切换到下一月'));
+    $('addBtn').addEventListener('click', () => showToast('打开运动记录页面'));
+
+    let tt;
+    function showToast(m) {
+      $('toast').textContent = m;
+      $('toast').classList.add('show');
+      clearTimeout(tt);
+      tt = setTimeout(() => $('toast').classList.remove('show'), 1400);
+    }
+
+    renderCal();
+    renderDetail();
+    renderSheet();
+  </script>
+</body>
+</html>

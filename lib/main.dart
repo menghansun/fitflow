@@ -69,15 +69,18 @@ class _FitFlowAppState extends State<FitFlowApp> {
                 WidgetsBinding.instance.addPostFrameCallback((_) async {
                   if (_loadedUserId != uid) {
                     _loadedUserId = uid;
-                    await context.read<WorkoutProvider>().loadForUser(uid);
+                    final workoutProvider = context.read<WorkoutProvider>();
+                    final bodyMetricsProvider = context.read<BodyMetricsProvider>();
+                    final achievementProvider = context.read<AchievementProvider>();
+                    await workoutProvider.loadForUser(uid);
                     if (!context.mounted) return;
-                    await context.read<BodyMetricsProvider>().loadForUser(uid);
+                    await bodyMetricsProvider.loadForUser(uid);
                     if (!context.mounted) return;
-                    await context.read<AchievementProvider>().init(uid);
+                    await achievementProvider.init(uid);
                     // 设置成就检查回调
-                    context.read<WorkoutProvider>().onSessionsChanged = () async {
-                      final sessions = context.read<WorkoutProvider>().sessions;
-                      final newlyUnlocked = await context.read<AchievementProvider>().checkAndUpdateAchievements(sessions);
+                    workoutProvider.onSessionsChanged = () async {
+                      final sessions = workoutProvider.sessions;
+                      final newlyUnlocked = await achievementProvider.checkAndUpdateAchievements(sessions);
                       final dialogContext = _navigatorKey.currentContext;
                       if (dialogContext == null) return;
 
@@ -86,8 +89,8 @@ class _FitFlowAppState extends State<FitFlowApp> {
                       }
                     };
                     // 初始检查成就（不显示弹窗）
-                    final sessions = context.read<WorkoutProvider>().sessions;
-                    await context.read<AchievementProvider>().checkAndUpdateAchievements(sessions);
+                    final sessions = workoutProvider.sessions;
+                    await achievementProvider.checkAndUpdateAchievements(sessions);
                   }
                 });
               } else if (isLoggedIn) {
@@ -98,27 +101,29 @@ class _FitFlowAppState extends State<FitFlowApp> {
                     final newUid = userProvider.currentUser!.id;
                     if (_loadedUserId != newUid) {
                       _loadedUserId = newUid;
-                      if (context.mounted) {
-                        await context.read<WorkoutProvider>().loadForUser(newUid);
-                        if (!context.mounted) return;
-                        await context.read<BodyMetricsProvider>().loadForUser(newUid);
-                        if (!context.mounted) return;
-                        await context.read<AchievementProvider>().init(newUid);
-                        // 设置成就检查回调
-                        context.read<WorkoutProvider>().onSessionsChanged = () async {
-                          final sessions = context.read<WorkoutProvider>().sessions;
-                          final newlyUnlocked = await context.read<AchievementProvider>().checkAndUpdateAchievements(sessions);
-                          final dialogContext = _navigatorKey.currentContext;
-                          if (dialogContext == null) return;
+                      if (!context.mounted) return;
+                      final workoutProvider = context.read<WorkoutProvider>();
+                      final bodyMetricsProvider = context.read<BodyMetricsProvider>();
+                      final achievementProvider = context.read<AchievementProvider>();
+                      await workoutProvider.loadForUser(newUid);
+                      if (!context.mounted) return;
+                      await bodyMetricsProvider.loadForUser(newUid);
+                      if (!context.mounted) return;
+                      await achievementProvider.init(newUid);
+                      // 设置成就检查回调
+                      workoutProvider.onSessionsChanged = () async {
+                        final sessions = workoutProvider.sessions;
+                        final newlyUnlocked = await achievementProvider.checkAndUpdateAchievements(sessions);
+                        final dialogContext = _navigatorKey.currentContext;
+                        if (dialogContext == null) return;
 
-                          for (final achievement in newlyUnlocked) {
-                            await showAchievementUnlockDialog(dialogContext, achievement);
-                          }
-                        };
-                        // 初始检查成就（不显示弹窗）
-                        final sessions = context.read<WorkoutProvider>().sessions;
-                        await context.read<AchievementProvider>().checkAndUpdateAchievements(sessions);
-                      }
+                        for (final achievement in newlyUnlocked) {
+                          await showAchievementUnlockDialog(dialogContext, achievement);
+                        }
+                      };
+                      // 初始检查成就（不显示弹窗）
+                      final sessions = workoutProvider.sessions;
+                      await achievementProvider.checkAndUpdateAchievements(sessions);
                     }
                   }
                 });
