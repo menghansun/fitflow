@@ -165,14 +165,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           }),
                   child: Text(_isLogin ? '没有账户？立即注册' : '已有账户？登录'),
                 ),
-                const SizedBox(height: 4),
-                TextButton.icon(
-                  onPressed: _loading
-                      ? null
-                      : () => Navigator.pushNamed(context, '/design-preview'),
-                  icon: const Icon(Icons.web),
-                  label: const Text('查看 UI 预览'),
-                ),
               ],
             ),
           ),

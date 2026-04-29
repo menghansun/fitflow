@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/workout_session.dart';
 import '../../providers/workout_provider.dart';
+import '../../utils/gym_muscle_suggestion.dart';
 import '../../providers/user_provider.dart';
 import '../../widgets/session_card.dart';
 import '../session_detail_screen.dart';
@@ -32,6 +33,8 @@ class HomeScreen extends StatelessWidget {
                 .length;
 
             final weekSessions = workoutProvider.sessionsInPeriod(weekStart, weekEnd);
+            final sessionsForMuscleHint =
+                workoutProvider.sessions.where((s) => s.countsAsWorkout).toList();
 
             final user = userProvider.currentUser;
             final helloLine = user != null && user.nickname.trim().isNotEmpty
@@ -72,6 +75,7 @@ class HomeScreen extends StatelessWidget {
                     child: _TodaySuggestionCard(
                       todayCount: todayCount,
                       weekSessions: weekSessions,
+                      sessionsForMuscleHint: sessionsForMuscleHint,
                       goalType: _HomeGoalType.muscleGain,
                     ),
                   ),
@@ -538,15 +542,11 @@ class _WeeklySummaryCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(28),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF4F46E5), Color(0xFF0EA5E9)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF4F46E5).withValues(alpha: 0.22),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 24,
             offset: const Offset(0, 12),
           ),
@@ -555,11 +555,11 @@ class _WeeklySummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             '本周概览',
-            style: TextStyle(color: Colors.white70, fontSize: 14),
+            style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
           ),
-          SizedBox(height: 14),
+          const SizedBox(height: 14),
           Row(
             children: [
               Expanded(
@@ -611,14 +611,14 @@ class _WeeklyMetric extends StatelessWidget {
         Text(
           value,
           style: const TextStyle(
-            color: Colors.white,
+            color: Color(0xFF4F46E5),
             fontSize: 26,
             fontWeight: FontWeight.w800,
           ),
         ),
         Text(
           label,
-          style: const TextStyle(color: Colors.white70, fontSize: 13),
+          style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
         ),
       ],
     );
@@ -828,63 +828,21 @@ _HomeMuscleSuggestion _homeGetMuscleGroupSuggestion(
   List<WorkoutSession> sessions,
   DateTime now,
 ) {
-  final recentGymSessions = sessions
-      .where((s) => s.type == WorkoutType.gym && s.exercises != null)
-      .toList()
-    ..sort((a, b) => b.date.compareTo(a.date));
-
-  final muscleGroupDays = <MuscleGroup, int>{};
-  for (final session in recentGymSessions) {
-    final daysAgo = now.difference(session.date).inDays;
-    if (daysAgo > 7) break;
-    for (final exercise in session.exercises!) {
-      muscleGroupDays[exercise.muscleGroup] = daysAgo;
-    }
-  }
-
-  MuscleGroup? leastTrained;
-  int maxDays = 0;
-  for (final entry in muscleGroupDays.entries) {
-    if (entry.value > maxDays) {
-      maxDays = entry.value;
-      leastTrained = entry.key;
-    }
-  }
-
-  switch (leastTrained) {
-    case MuscleGroup.chest:
-    case MuscleGroup.shoulders:
-    case MuscleGroup.arms:
-      return const _HomeMuscleSuggestion(
-        name: '上肢推（胸肩手臂）',
-        hint: '胸部、肩部、手臂有一段时间没练了，今天推类训练很合适。',
-      );
-    case MuscleGroup.back:
-      return const _HomeMuscleSuggestion(
-        name: '背部',
-        hint: '背部肌肉最近没怎么练，拉类训练可以帮助改善体态。',
-      );
-    case MuscleGroup.glutesAndLegs:
-      return const _HomeMuscleSuggestion(
-        name: '臀腿',
-        hint: '臀腿是人体最大的肌群，训练收益很高，今天很适合练。',
-      );
-    default:
-      return const _HomeMuscleSuggestion(
-        name: '背部',
-        hint: '今天推荐练背部，帮助改善体态和提升力量。',
-      );
-  }
+  final s = computeGymMuscleSuggestion(sessions, now);
+  return _HomeMuscleSuggestion(name: s.name, hint: s.hint);
 }
 
 class _TodaySuggestionCard extends StatelessWidget {
   final int todayCount;
   final List<WorkoutSession> weekSessions;
+  /// Full history (or all loaded sessions) for "last trained" muscle logic — not only ISO week.
+  final List<WorkoutSession> sessionsForMuscleHint;
   final _HomeGoalType goalType;
 
   const _TodaySuggestionCard({
     required this.todayCount,
     required this.weekSessions,
+    required this.sessionsForMuscleHint,
     required this.goalType,
   });
 
@@ -946,7 +904,7 @@ class _TodaySuggestionCard extends StatelessWidget {
           final ratio = strengthRemaining / 2;
           final swimRatio = swimCardioRemaining / 2;
           if (ratio >= swimRatio) {
-            final suggestion = _homeGetMuscleGroupSuggestion(weekSessions, now);
+            final suggestion = _homeGetMuscleGroupSuggestion(sessionsForMuscleHint, now);
             icon = '💪';
             title = '今天适合练${suggestion.name}';
           } else {
@@ -954,7 +912,7 @@ class _TodaySuggestionCard extends StatelessWidget {
             title = '今天适合游泳/有氧';
           }
         } else if (strengthRemaining > 0) {
-          final suggestion = _homeGetMuscleGroupSuggestion(weekSessions, now);
+          final suggestion = _homeGetMuscleGroupSuggestion(sessionsForMuscleHint, now);
           icon = '💪';
           title = '今天适合练${suggestion.name}';
         } else if (swimCardioRemaining > 0) {
@@ -968,7 +926,7 @@ class _TodaySuggestionCard extends StatelessWidget {
 
       case _HomeGoalType.muscleGain:
         if (strengthRemaining > 0) {
-          final suggestion = _homeGetMuscleGroupSuggestion(weekSessions, now);
+          final suggestion = _homeGetMuscleGroupSuggestion(sessionsForMuscleHint, now);
           icon = '💪';
           title = '今天适合练${suggestion.name}';
         } else if (swimCardioRemaining > 0) {
@@ -985,7 +943,7 @@ class _TodaySuggestionCard extends StatelessWidget {
           icon = '🏊';
           title = '今天适合游泳';
         } else if (strengthRemaining > 0) {
-          final suggestion = _homeGetMuscleGroupSuggestion(weekSessions, now);
+          final suggestion = _homeGetMuscleGroupSuggestion(sessionsForMuscleHint, now);
           icon = '💪';
           title = '今天适合练${suggestion.name}';
         } else {
@@ -999,7 +957,7 @@ class _TodaySuggestionCard extends StatelessWidget {
           final ratio = strengthRemaining / 2;
           final swimRatio = swimCardioRemaining / 2;
           if (ratio >= swimRatio) {
-            final suggestion = _homeGetMuscleGroupSuggestion(weekSessions, now);
+            final suggestion = _homeGetMuscleGroupSuggestion(sessionsForMuscleHint, now);
             icon = '💪';
             title = '今天适合练${suggestion.name}';
           } else {
@@ -1007,7 +965,7 @@ class _TodaySuggestionCard extends StatelessWidget {
             title = '今天适合游泳/有氧';
           }
         } else if (strengthRemaining > 0) {
-          final suggestion = _homeGetMuscleGroupSuggestion(weekSessions, now);
+          final suggestion = _homeGetMuscleGroupSuggestion(sessionsForMuscleHint, now);
           icon = '💪';
           title = '今天适合练${suggestion.name}';
         } else if (swimCardioRemaining > 0) {

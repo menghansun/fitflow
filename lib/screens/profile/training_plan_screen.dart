@@ -11,6 +11,7 @@ import '../../providers/body_metrics_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/workout_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/gym_muscle_suggestion.dart';
 
 enum _TrainingGoalType {
   fatLoss,
@@ -929,53 +930,8 @@ _PlanSuggestion _buildMuscleSuggestion(
 }
 
 _MuscleSuggestion _getMuscleGroupSuggestion(List<WorkoutSession> sessions, DateTime now) {
-  final recentGymSessions = sessions
-      .where((s) => s.type == WorkoutType.gym && s.exercises != null)
-      .toList()
-    ..sort((a, b) => b.date.compareTo(a.date));
-
-  final muscleGroupDays = <MuscleGroup, int>{};
-  for (final session in recentGymSessions) {
-    final daysAgo = now.difference(session.date).inDays;
-    if (daysAgo > 7) break;
-    for (final exercise in session.exercises!) {
-      muscleGroupDays[exercise.muscleGroup] = daysAgo;
-    }
-  }
-
-  MuscleGroup? leastTrained;
-  int maxDays = 0;
-  for (final entry in muscleGroupDays.entries) {
-    if (entry.value > maxDays) {
-      maxDays = entry.value;
-      leastTrained = entry.key;
-    }
-  }
-
-  switch (leastTrained) {
-    case MuscleGroup.chest:
-    case MuscleGroup.shoulders:
-    case MuscleGroup.arms:
-      return const _MuscleSuggestion(
-        name: '上肢推（胸肩手臂）',
-        hint: '胸部、肩部、手臂有一段时间没练了，今天推类训练很合适。',
-      );
-    case MuscleGroup.back:
-      return const _MuscleSuggestion(
-        name: '背部',
-        hint: '背部肌肉最近没怎么练，拉类训练可以帮助改善体态。',
-      );
-    case MuscleGroup.glutesAndLegs:
-      return const _MuscleSuggestion(
-        name: '臀腿',
-        hint: '臀腿是人体最大的肌群，训练收益很高，今天很适合练。',
-      );
-    default:
-      return const _MuscleSuggestion(
-        name: '背部',
-        hint: '今天推荐练背部，帮助改善体态和提升力量。',
-      );
-  }
+  final s = computeGymMuscleSuggestion(sessions, now);
+  return _MuscleSuggestion(name: s.name, hint: s.hint);
 }
 
 class _MuscleSuggestion {

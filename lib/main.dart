@@ -14,7 +14,6 @@ import 'theme/app_theme.dart';
 import 'screens/main_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/profile/profile_screen.dart';
-import 'screens/design_preview/design_preview_screen.dart';
 import 'widgets/achievement_unlock_dialog.dart';
 
 void main() async {
@@ -156,7 +155,6 @@ class _FitFlowAppState extends State<FitFlowApp> {
       ],
       routes: {
         '/profile': (_) => const ProfileScreen(),
-        '/design-preview': (_) => const DesignPreviewScreen(),
       },
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,

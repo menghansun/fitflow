@@ -341,43 +341,42 @@ _RollingInsight _insightForWeek({
   required int lastSessionCount,
   required int lastMins,
   required int lastCals,
+  required int longestStreak,
+  required int avgMinsPerSession,
+  required int bestWeekday,
+  required int longestSessionMins,
 }) {
   final momS = _insightPercentDelta(sessionCount, lastSessionCount);
-  final momM = _insightPercentDelta(totalMins, lastMins);
-  final momC = _insightPercentDelta(totalCals, lastCals);
   final pool = <_RollingInsight>[
     _RollingInsight(
       icon: '🔥',
-      title: '本周累计 $sessionCount 次',
-      description: '活跃 $activeDays 天',
+      title: '已连续坚持 $longestStreak 天',
+      description: '继续加油别中断',
       score: momS,
     ),
-    if (totalMins > 0)
-      _RollingInsight(
-        icon: '⏱️',
-        title: '本周训练 $totalMins 分钟',
-        description: '约 ${(totalMins / 60).toStringAsFixed(1)} 小时\n时长环比 $momM',
-        score: momM,
-      ),
-    if (totalCals > 0)
-      _RollingInsight(
-        icon: '📊',
-        title: '本周约 $totalCals kcal',
-        description: '估算消耗 · 热量环比 $momC',
-        score: momC,
-      ),
-    if (swimN + gymN + cardioN > 0)
-      _RollingInsight(
-        icon: '🎯',
-        title: '游 $swimN · 力量 $gymN · 有氧 $cardioN',
-        description: '按次数 · 次数环比 $momS',
-        score: momS,
-      ),
+    _RollingInsight(
+      icon: '⏱️',
+      title: '平均每次 $avgMinsPerSession 分钟',
+      description: '本周场均时长',
+      score: momS,
+    ),
+    _RollingInsight(
+      icon: '📅',
+      title: '周${_weekdayName(bestWeekday)}练最多',
+      description: '本周最佳训练日',
+      score: momS,
+    ),
+    _RollingInsight(
+      icon: '🏆',
+      title: '单次最长 ${longestSessionMins} 分钟',
+      description: '本周个人记录',
+      score: momS,
+    ),
     if (swimKm >= 0.05)
       _RollingInsight(
         icon: '🏊',
         title: '游泳约 ${swimKm.toStringAsFixed(1)} km',
-        description: '下水 $swimN 次 · 环比 $momS',
+        description: '下水 $swimN 次',
         score: momS,
       ),
   ];
@@ -402,43 +401,42 @@ _RollingInsight _insightForMonth({
   required int lastSessionCount,
   required int lastMins,
   required int lastCals,
+  required int longestStreak,
+  required int avgMinsPerSession,
+  required int bestWeekday,
+  required int longestSessionMins,
 }) {
   final momS = _insightPercentDelta(sessionCount, lastSessionCount);
-  final momM = _insightPercentDelta(totalMins, lastMins);
-  final momC = _insightPercentDelta(totalCals, lastCals);
   final pool = <_RollingInsight>[
     _RollingInsight(
-      icon: '🏆',
-      title: '本月累计 $sessionCount 次',
-      description: '活跃 $activeDays 天',
+      icon: '🔥',
+      title: '已连续坚持 $longestStreak 天',
+      description: '本月最佳状态',
       score: momS,
     ),
-    if (totalMins > 0)
-      _RollingInsight(
-        icon: '⏱️',
-        title: '本月训练 $totalMins 分钟',
-        description: '约 ${(totalMins / 60).toStringAsFixed(1)} 小时\n时长环比 $momM',
-        score: momM,
-      ),
-    if (totalCals > 0)
-      _RollingInsight(
-        icon: '📊',
-        title: '本月约 $totalCals kcal',
-        description: '估算消耗 · 热量环比 $momC',
-        score: momC,
-      ),
-    if (swimN + gymN + cardioN > 0)
-      _RollingInsight(
-        icon: '🎯',
-        title: '游 $swimN · 力量 $gymN · 有氧 $cardioN',
-        description: '次数结构 · 环比 $momS',
-        score: momS,
-      ),
+    _RollingInsight(
+      icon: '⏱️',
+      title: '平均每次 $avgMinsPerSession 分钟',
+      description: '本月场均时长',
+      score: momS,
+    ),
+    _RollingInsight(
+      icon: '📅',
+      title: '本月周${_weekdayName(bestWeekday)}练最多',
+      description: '你的专属训练日',
+      score: momS,
+    ),
+    _RollingInsight(
+      icon: '🏆',
+      title: '单次最长 ${longestSessionMins} 分钟',
+      description: '本月个人记录',
+      score: momS,
+    ),
     if (swimKm >= 0.05)
       _RollingInsight(
         icon: '🏊',
         title: '游泳约 ${swimKm.toStringAsFixed(1)} km',
-        description: '下水 $swimN 次 · 环比 $momS',
+        description: '下水 $swimN 次',
         score: momS,
       ),
   ];
@@ -459,43 +457,42 @@ _RollingInsight _insightForYear({
   required int lastSessionCount,
   required int lastMins,
   required int lastCals,
+  required int longestStreak,
+  required int avgMinsPerSession,
+  required int bestMonth,
+  required int longestSessionMins,
 }) {
   final momS = _insightPercentDelta(sessionCount, lastSessionCount);
-  final momM = _insightPercentDelta(totalMins, lastMins);
-  final momC = _insightPercentDelta(totalCals, lastCals);
   final pool = <_RollingInsight>[
     _RollingInsight(
-      icon: '📈',
-      title: '$year 年累计 $sessionCount 次',
-      description: '活跃 $activeMonths 个月',
+      icon: '🔥',
+      title: '已连续坚持 $longestStreak 天',
+      description: '今年最佳状态',
       score: momS,
     ),
-    if (totalMins > 0)
-      _RollingInsight(
-        icon: '⏱️',
-        title: '$year 年训练 $totalMins 分钟',
-        description: '约 ${(totalMins / 60).toStringAsFixed(0)} 小时\n时长同比 $momM',
-        score: momM,
-      ),
-    if (totalCals > 0)
-      _RollingInsight(
-        icon: '📊',
-        title: '$year 年约 $totalCals kcal',
-        description: '估算消耗 · 热量同比 $momC',
-        score: momC,
-      ),
-    if (swimN + gymN + cardioN > 0)
-      _RollingInsight(
-        icon: '🎯',
-        title: '游 $swimN · 力量 $gymN · 有氧 $cardioN',
-        description: '全年次数 · 同比 $momS',
-        score: momS,
-      ),
+    _RollingInsight(
+      icon: '⏱️',
+      title: '平均每次 $avgMinsPerSession 分钟',
+      description: '今年场均时长',
+      score: momS,
+    ),
+    _RollingInsight(
+      icon: '📅',
+      title: '${bestMonth}月训练最多',
+      description: '今年的明星月份',
+      score: momS,
+    ),
+    _RollingInsight(
+      icon: '🏆',
+      title: '单次最长 ${longestSessionMins} 分钟',
+      description: '今年个人记录',
+      score: momS,
+    ),
     if (swimKm >= 0.05)
       _RollingInsight(
         icon: '🏊',
         title: '全年游泳 ${(swimKm).toStringAsFixed(1)} km',
-        description: '下水 $swimN 次 · 同比 $momS',
+        description: '下水 $swimN 次',
         score: momS,
       ),
   ];
@@ -514,35 +511,34 @@ _RollingInsight _insightForAllTime({
   required int cardioN,
   required double swimKm,
   required int sportMonths,
+  required int avgMinsPerSession,
+  required int longestSessionMins,
 }) {
   final pool = <_RollingInsight>[
     _RollingInsight(
-      icon: '💎',
-      title: '累计 $sessionCount 次',
-      description: '活跃 $activeDays 天\n最长连续 $longestStreak 天',
+      icon: '🔥',
+      title: '最长连续打卡 $longestStreak 天',
+      description: '继续保持别中断',
       score: '$sessionCount次',
     ),
-    if (totalMins > 0)
-      _RollingInsight(
-        icon: '⏱️',
-        title: '总训练 $totalMins 分钟',
-        description: '约 ${(totalMins / 60).toStringAsFixed(0)} 小时 · 跨度 $sportMonths 个月',
-        score: '${totalMins ~/ 60}h',
-      ),
-    if (totalCals > 0)
-      _RollingInsight(
-        icon: '📊',
-        title: '累计约 $totalCals kcal',
-        description: '估算消耗 · 全程记录',
-        score: _formatThousands(totalCals),
-      ),
-    if (swimN + gymN + cardioN > 0)
-      _RollingInsight(
-        icon: '🎯',
-        title: '游 $swimN · 力量 $gymN · 有氧 $cardioN',
-        description: '按次数统计的分布',
-        score: '$sessionCount次',
-      ),
+    _RollingInsight(
+      icon: '⏱️',
+      title: '平均每次 $avgMinsPerSession 分钟',
+      description: '历史场均时长',
+      score: '${totalMins ~/ 60}h',
+    ),
+    _RollingInsight(
+      icon: '📅',
+      title: '累计 $sportMonths 个月',
+      description: '运动跨度 · 持续坚持',
+      score: '$sessionCount次',
+    ),
+    _RollingInsight(
+      icon: '🏆',
+      title: '单次最长 $longestSessionMins 分钟',
+      description: '历史个人记录',
+      score: '$longestSessionMins分',
+    ),
     if (swimKm >= 0.05)
       _RollingInsight(
         icon: '🏊',
@@ -560,6 +556,11 @@ String _formatThousands(int n) {
   if (n < 1000) return '$n';
   if (n < 1000000) return '${(n / 1000).toStringAsFixed(1)}k';
   return '${(n / 1000000).toStringAsFixed(1)}M';
+}
+
+String _weekdayName(int weekday) {
+  const names = ['一', '二', '三', '四', '五', '六', '日'];
+  return names[weekday - 1];
 }
 
 (DateTime, DateTime) _range(DateTime now, _Period period) {
@@ -652,20 +653,28 @@ class _MonthStatsView extends StatelessWidget {
           dailyCalories[day] = (dailyCalories[day] ?? 0) + (s.calories ?? 0);
         }
 
-        // 上月同期（真实数据对比）
+        // Previous month totals for insights
         final prevMonthStart = DateTime(start.year, start.month - 1, 1);
         final prevMonthEnd = DateTime(start.year, start.month, 0, 23, 59, 59);
         final lastMonthSessions = provider.sessionsInPeriod(prevMonthStart, prevMonthEnd);
-        final lastMonthGym = lastMonthSessions.where((s) => s.type == WorkoutType.gym).toList();
-        final lastMonthCardio = lastMonthSessions.where((s) => s.type == WorkoutType.cardio).toList();
-        final lastMonthSwimDist = provider.getSwimDistanceForPeriodM(prevMonthStart, prevMonthEnd);
-        final lastMonthGymSets = lastMonthGym.fold<int>(
-            0, (sum, s) => sum + (s.exercises?.fold<int>(0, (s2, e) => s2 + e.sets.length) ?? 0));
-        final lastMonthCardioMins =
-            lastMonthCardio.fold<int>(0, (sum, s) => sum + (s.durationMinutes ?? s.durationSeconds ~/ 60));
         final lastMonthTotalMins = provider.getTotalDurationForPeriod(prevMonthStart, prevMonthEnd) ~/ 60;
         final lastMonthTotalCals =
             lastMonthSessions.fold<int>(0, (sum, s) => sum + (s.calories ?? 0));
+
+        // 计算洞察所需的新参数
+        final avgMinsPerSession = sessions.isEmpty ? 0 : totalMins ~/ sessions.length;
+        final longestSessionMins = sessions.isEmpty
+            ? 0
+            : sessions.map((s) => s.durationMinutes ?? s.durationSeconds ~/ 60).reduce((a, b) => a > b ? a : b);
+        final weekdayCounts = <int, int>{};
+        for (final s in sessions) {
+          weekdayCounts[s.date.weekday] = (weekdayCounts[s.date.weekday] ?? 0) + 1;
+        }
+        final bestWeekday = weekdayCounts.entries.isEmpty
+            ? 1
+            : weekdayCounts.entries.reduce((a, b) => a.value > b.value ? a : b).key;
+        final longestStreak = provider.currentStreak;
+
         final monthInsight = _insightForMonth(
           year: start.year,
           month: start.month,
@@ -680,77 +689,34 @@ class _MonthStatsView extends StatelessWidget {
           lastSessionCount: lastMonthSessions.length,
           lastMins: lastMonthTotalMins,
           lastCals: lastMonthTotalCals,
+          longestStreak: longestStreak,
+          avgMinsPerSession: avgMinsPerSession,
+          bestWeekday: bestWeekday,
+          longestSessionMins: longestSessionMins,
         );
-
-        String formatIncrement(double current, double last, String unit) {
-          final diff = current - last;
-          if (diff >= 0) return '+${diff.toStringAsFixed(1)}$unit';
-          return '${diff.toStringAsFixed(1)}$unit';
-        }
 
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 10, 20, 110),
           child: Column(
             children: [
-              _OverviewHeroCard(
-                headline: '本月概览',
-                datePillText: monthName,
-                onDateTap: onMonthTap,
+              _PastelPeriodHeroCard(
+                headlineText: monthName,
+                pillText: monthName,
+                periodPrefix: '本月',
                 sessions: sessions.length,
                 totalMins: totalMins,
                 totalCals: totalCals,
+                onDateTap: onMonthTap,
+                swimCount: swimSessions.length,
+                swimKm: swimDist / 1000,
+                gymCount: gymSessions.length,
+                gymSets: gymSets,
+                cardioCount: cardioSessions.length,
+                cardioMins: cardioMins,
               ),
-              const SizedBox(height: 14),
-              _InsightCardNew(
-                icon: monthInsight.icon,
-                title: monthInsight.title,
-                description: monthInsight.description,
-                score: monthInsight.score,
-              ),
+              const SizedBox(height: 20),
               Padding(
-                padding: const EdgeInsets.only(top: 20, left: 2, right: 2, bottom: 12),
-                child: _SectionHeader(title: '关键指标', subtitle: '对比上月'),
-              ),
-              _KeyMetricsRow(
-                items: [
-                  _KeyMetricItem(
-                    icon: '🏊',
-                    count: swimSessions.length,
-                    value: '${(swimDist / 1000).toStringAsFixed(1)} km',
-                    label: '游泳距离',
-                    increment: formatIncrement(swimDist / 1000, lastMonthSwimDist / 1000, 'km'),
-                    color: const Color(0xFF0EA5E9),
-                  ),
-                  _KeyMetricItem(
-                    icon: '💪',
-                    count: gymSessions.length,
-                    value: '$gymSets 组',
-                    label: '力量训练',
-                    increment: formatIncrement(gymSets.toDouble(), lastMonthGymSets.toDouble(), '组'),
-                    color: const Color(0xFFFF6B35),
-                  ),
-                  _KeyMetricItem(
-                    icon: '🏃',
-                    count: cardioSessions.length,
-                    value: '$cardioMins 分钟',
-                    label: '有氧时长',
-                    increment: formatIncrement(cardioMins.toDouble(), lastMonthCardioMins.toDouble(), '分钟'),
-                    color: const Color(0xFF10B981),
-                  ),
-                ],
-              ),
-              Padding(
-                padding: const EdgeInsets.only(top: 20, left: 2, right: 2, bottom: 12),
-                child: _SectionHeader(title: '训练趋势', subtitle: '分钟 / 周'),
-              ),
-              _ActivityChart(
-                period: _Period.month,
-                provider: provider,
-                start: start,
-                end: end,
-              ),
-              Padding(
-                padding: const EdgeInsets.only(top: 20, left: 2, right: 2, bottom: 12),
+                padding: const EdgeInsets.only(left: 2, right: 2, bottom: 12),
                 child: _SectionHeader(title: '热力分布', subtitle: '日历热力图'),
               ),
               Container(
@@ -770,20 +736,6 @@ class _MonthStatsView extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '${end.year}年${end.month}月运动分布',
-                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                        ),
-                        const Text(
-                          '按每日热量',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF6B7280)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
                     _MonthCalendarHeatmap(
                       year: end.year,
                       month: end.month,
@@ -808,6 +760,23 @@ class _MonthStatsView extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 14),
+              _InsightCardNew(
+                icon: monthInsight.icon,
+                title: monthInsight.title,
+                description: monthInsight.description,
+                score: monthInsight.score,
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 20, left: 2, right: 2, bottom: 12),
+                child: _SectionHeader(title: '训练趋势', subtitle: '分钟 / 周'),
+              ),
+              _ActivityChart(
+                period: _Period.month,
+                provider: provider,
+                start: start,
+                end: end,
               ),
               Padding(
                 padding: const EdgeInsets.only(top: 20, left: 2, right: 2, bottom: 12),
@@ -867,11 +836,6 @@ class _WeekStatsView extends StatelessWidget {
         final lastWeekStart = start.subtract(const Duration(days: 7));
         final lastWeekEnd = end.subtract(const Duration(days: 7));
         final lastWeekSessions = provider.sessionsInPeriod(lastWeekStart, lastWeekEnd);
-        final lastWeekSwimDist = provider.getSwimDistanceForPeriodM(lastWeekStart, lastWeekEnd);
-        final lastWeekGymSessions = lastWeekSessions.where((s) => s.type == WorkoutType.gym).toList();
-        final lastWeekCardioSessions = lastWeekSessions.where((s) => s.type == WorkoutType.cardio).toList();
-        final lastWeekGymSets = lastWeekGymSessions.fold<int>(0, (sum, s) => sum + (s.exercises?.fold<int>(0, (s2, e) => s2 + e.sets.length) ?? 0));
-        final lastWeekCardioMins = lastWeekCardioSessions.fold<int>(0, (sum, s) => sum + (s.durationMinutes ?? s.durationSeconds ~/ 60));
 
         final weekActiveDays = sessions
             .map((s) => DateTime(s.date.year, s.date.month, s.date.day))
@@ -880,6 +844,22 @@ class _WeekStatsView extends StatelessWidget {
         final lastWeekTotalMins = provider.getTotalDurationForPeriod(lastWeekStart, lastWeekEnd) ~/ 60;
         final lastWeekTotalCals =
             lastWeekSessions.fold<int>(0, (sum, s) => sum + (s.calories ?? 0));
+
+        // 计算洞察所需的新参数
+        final weekSessionCount = sessions.length;
+        final avgMinsPerSession = weekSessionCount > 0 ? totalMins ~/ weekSessionCount : 0;
+        final longestSessionMins = sessions.isEmpty
+            ? 0
+            : sessions.map((s) => s.durationMinutes ?? s.durationSeconds ~/ 60).reduce((a, b) => a > b ? a : b);
+        final weekdayCounts = <int, int>{};
+        for (final s in sessions) {
+          weekdayCounts[s.date.weekday] = (weekdayCounts[s.date.weekday] ?? 0) + 1;
+        }
+        final bestWeekday = weekdayCounts.entries.isEmpty
+            ? 1
+            : weekdayCounts.entries.reduce((a, b) => a.value > b.value ? a : b).key;
+        final longestStreak = provider.currentStreak;
+
         final weekInsight = _insightForWeek(
           weekStart: start,
           sessionCount: sessions.length,
@@ -893,29 +873,49 @@ class _WeekStatsView extends StatelessWidget {
           lastSessionCount: lastWeekSessions.length,
           lastMins: lastWeekTotalMins,
           lastCals: lastWeekTotalCals,
+          longestStreak: longestStreak,
+          avgMinsPerSession: avgMinsPerSession,
+          bestWeekday: bestWeekday,
+          longestSessionMins: longestSessionMins,
         );
 
-        // 计算增量
-        String formatIncrement(double current, double last, String unit) {
-          final diff = current - last;
-          if (diff >= 0) return '+${diff.toStringAsFixed(1)}$unit';
-          return '${diff.toStringAsFixed(1)}$unit';
-        }
+        final weekEndDay = start.add(const Duration(days: 6));
 
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 10, 20, 110),
           child: Column(
             children: [
               // ═══════════════════════════════════════════
-              //  Hero 区域 - 蓝紫渐变卡片
+              //  Week summary — pastel grid
               // ═══════════════════════════════════════════
-              _WeekHeroCard(
-                weekNum: weekNum,
-                start: start,
+              _PastelPeriodHeroCard(
+                headlineText: '${start.year} 第 $weekNum 周',
+                pillText: '${start.month}/${start.day} - ${weekEndDay.month}/${weekEndDay.day}',
+                periodPrefix: '本周',
                 sessions: sessions.length,
                 totalMins: totalMins,
                 totalCals: totalCals,
                 onDateTap: onWeekTap,
+                swimCount: swimSessions.length,
+                swimKm: swimDist / 1000,
+                gymCount: gymSessions.length,
+                gymSets: gymSets,
+                cardioCount: cardioSessions.length,
+                cardioMins: cardioMins,
+              ),
+
+              const SizedBox(height: 20),
+
+              // ═══════════════════════════════════════════
+              //  热力分布
+              // ═══════════════════════════════════════════
+              Padding(
+                padding: const EdgeInsets.only(left: 2, right: 2, bottom: 12),
+                child: _SectionHeader(title: '热力分布', subtitle: '按每日热量'),
+              ),
+              _WeekHeatmapGrid(
+                start: start,
+                dailyCalories: dailyCalories,
               ),
 
               const SizedBox(height: 14),
@@ -931,42 +931,6 @@ class _WeekStatsView extends StatelessWidget {
               ),
 
               // ═══════════════════════════════════════════
-              //  关键指标标题 + 三列卡片
-              // ═══════════════════════════════════════════
-              Padding(
-                padding: const EdgeInsets.only(top: 20, left: 2, right: 2, bottom: 12),
-                child: _SectionHeader(title: '关键指标', subtitle: '对比上周'),
-              ),
-              _KeyMetricsRow(
-                items: [
-                  _KeyMetricItem(
-                    icon: '🏊',
-                    count: swimSessions.length,
-                    value: '${(swimDist / 1000).toStringAsFixed(1)} km',
-                    label: '游泳距离',
-                    increment: formatIncrement(swimDist / 1000, lastWeekSwimDist / 1000, 'km'),
-                    color: const Color(0xFF0EA5E9),
-                  ),
-                  _KeyMetricItem(
-                    icon: '💪',
-                    count: gymSessions.length,
-                    value: '$gymSets 组',
-                    label: '力量训练',
-                    increment: formatIncrement(gymSets.toDouble(), lastWeekGymSets.toDouble(), '组'),
-                    color: const Color(0xFFFF6B35),
-                  ),
-                  _KeyMetricItem(
-                    icon: '🏃',
-                    count: cardioSessions.length,
-                    value: '$cardioMins 分钟',
-                    label: '有氧时长',
-                    increment: formatIncrement(cardioMins.toDouble(), lastWeekCardioMins.toDouble(), '分钟'),
-                    color: const Color(0xFF10B981),
-                  ),
-                ],
-              ),
-
-              // ═══════════════════════════════════════════
               //  训练趋势
               // ═══════════════════════════════════════════
               Padding(
@@ -976,18 +940,6 @@ class _WeekStatsView extends StatelessWidget {
               _WeekBarsChart(
                 sessions: sessions,
                 start: start,
-              ),
-
-              // ═══════════════════════════════════════════
-              //  热力分布
-              // ═══════════════════════════════════════════
-              Padding(
-                padding: const EdgeInsets.only(top: 20, left: 2, right: 2, bottom: 12),
-                child: _SectionHeader(title: '热力分布', subtitle: '按每日热量'),
-              ),
-              _WeekHeatmapGrid(
-                start: start,
-                dailyCalories: dailyCalories,
               ),
 
               // ═══════════════════════════════════════════
@@ -1064,16 +1016,24 @@ class _YearStatsView extends StatelessWidget {
         final prevYearStart = DateTime(start.year - 1, 1, 1);
         final prevYearEnd = DateTime(start.year - 1, 12, 31, 23, 59, 59);
         final lastYearSessions = provider.sessionsInPeriod(prevYearStart, prevYearEnd);
-        final lastYearGym = lastYearSessions.where((s) => s.type == WorkoutType.gym).toList();
-        final lastYearCardio = lastYearSessions.where((s) => s.type == WorkoutType.cardio).toList();
-        final lastYearSwimDist = provider.getSwimDistanceForPeriodM(prevYearStart, prevYearEnd);
-        final lastYearGymSets = lastYearGym.fold<int>(
-            0, (sum, s) => sum + (s.exercises?.fold<int>(0, (s2, e) => s2 + e.sets.length) ?? 0));
-        final lastYearCardioMins =
-            lastYearCardio.fold<int>(0, (sum, s) => sum + (s.durationMinutes ?? s.durationSeconds ~/ 60));
         final lastYearTotalMins = provider.getTotalDurationForPeriod(prevYearStart, prevYearEnd) ~/ 60;
         final lastYearTotalCals =
             lastYearSessions.fold<int>(0, (sum, s) => sum + (s.calories ?? 0));
+
+        // 计算洞察所需的新参数
+        final avgMinsPerSession = sessions.isEmpty ? 0 : totalMins ~/ sessions.length;
+        final longestSessionMins = sessions.isEmpty
+            ? 0
+            : sessions.map((s) => s.durationMinutes ?? s.durationSeconds ~/ 60).reduce((a, b) => a > b ? a : b);
+        final monthCounts = <int, int>{};
+        for (final s in sessions) {
+          monthCounts[s.date.month] = (monthCounts[s.date.month] ?? 0) + 1;
+        }
+        final bestMonth = monthCounts.entries.isEmpty
+            ? start.month
+            : monthCounts.entries.reduce((a, b) => a.value > b.value ? a : b).key;
+        final longestStreak = provider.currentStreak;
+
         final yearInsight = _insightForYear(
           year: start.year,
           sessionCount: sessions.length,
@@ -1087,77 +1047,34 @@ class _YearStatsView extends StatelessWidget {
           lastSessionCount: lastYearSessions.length,
           lastMins: lastYearTotalMins,
           lastCals: lastYearTotalCals,
+          longestStreak: longestStreak,
+          avgMinsPerSession: avgMinsPerSession,
+          bestMonth: bestMonth,
+          longestSessionMins: longestSessionMins,
         );
-
-        String formatIncrement(double current, double last, String unit) {
-          final diff = current - last;
-          if (diff >= 0) return '+${diff.toStringAsFixed(1)}$unit';
-          return '${diff.toStringAsFixed(1)}$unit';
-        }
 
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 10, 20, 110),
           child: Column(
             children: [
-              _OverviewHeroCard(
-                headline: '年度概览',
-                datePillText: yearLabel,
-                onDateTap: onYearTap,
+              _PastelPeriodHeroCard(
+                headlineText: yearLabel,
+                pillText: yearLabel,
+                periodPrefix: '本年',
                 sessions: sessions.length,
                 totalMins: totalMins,
                 totalCals: totalCals,
+                onDateTap: onYearTap,
+                swimCount: swimSessions.length,
+                swimKm: swimDist / 1000,
+                gymCount: gymSessions.length,
+                gymSets: gymSets,
+                cardioCount: cardioSessions.length,
+                cardioMins: cardioMins,
               ),
-              const SizedBox(height: 14),
-              _InsightCardNew(
-                icon: yearInsight.icon,
-                title: yearInsight.title,
-                description: yearInsight.description,
-                score: yearInsight.score,
-              ),
+              const SizedBox(height: 20),
               Padding(
-                padding: const EdgeInsets.only(top: 20, left: 2, right: 2, bottom: 12),
-                child: _SectionHeader(title: '关键指标', subtitle: '对比去年同期'),
-              ),
-              _KeyMetricsRow(
-                items: [
-                  _KeyMetricItem(
-                    icon: '🏊',
-                    count: swimSessions.length,
-                    value: '${(swimDist / 1000).toStringAsFixed(1)} km',
-                    label: '游泳距离',
-                    increment: formatIncrement(swimDist / 1000, lastYearSwimDist / 1000, 'km'),
-                    color: const Color(0xFF0EA5E9),
-                  ),
-                  _KeyMetricItem(
-                    icon: '💪',
-                    count: gymSessions.length,
-                    value: '$gymSets 组',
-                    label: '力量训练',
-                    increment: formatIncrement(gymSets.toDouble(), lastYearGymSets.toDouble(), '组'),
-                    color: const Color(0xFFFF6B35),
-                  ),
-                  _KeyMetricItem(
-                    icon: '🏃',
-                    count: cardioSessions.length,
-                    value: '${cardioMins ~/ 60} 小时',
-                    label: '有氧时长',
-                    increment: formatIncrement(cardioMins / 60, lastYearCardioMins / 60, '小时'),
-                    color: const Color(0xFF10B981),
-                  ),
-                ],
-              ),
-              Padding(
-                padding: const EdgeInsets.only(top: 20, left: 2, right: 2, bottom: 12),
-                child: _SectionHeader(title: '训练趋势', subtitle: '次数 / 月'),
-              ),
-              _ActivityChart(
-                period: _Period.year,
-                provider: provider,
-                start: start,
-                end: end,
-              ),
-              Padding(
-                padding: const EdgeInsets.only(top: 20, left: 2, right: 2, bottom: 12),
+                padding: const EdgeInsets.only(left: 2, right: 2, bottom: 12),
                 child: _SectionHeader(title: '热力分布', subtitle: ''),
               ),
               Container(
@@ -1177,20 +1094,6 @@ class _YearStatsView extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '${start.year}年运动分布',
-                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                        ),
-                        const Text(
-                          '点击查看横屏大图',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF6B7280)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
                     _YearWeekHeatmap(
                       year: start.year,
                       sessions: sessions,
@@ -1198,8 +1101,33 @@ class _YearStatsView extends StatelessWidget {
                       suppressHeading: true,
                       onTap: () => _showYearHeatmapFullscreen(context, start.year, sessions, isDark),
                     ),
+                    const SizedBox(height: 10),
+                    const Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        '点击查看横屏大图',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF6B7280)),
+                      ),
+                    ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 14),
+              _InsightCardNew(
+                icon: yearInsight.icon,
+                title: yearInsight.title,
+                description: yearInsight.description,
+                score: yearInsight.score,
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 20, left: 2, right: 2, bottom: 12),
+                child: _SectionHeader(title: '训练趋势', subtitle: '次数 / 月'),
+              ),
+              _ActivityChart(
+                period: _Period.year,
+                provider: provider,
+                start: start,
+                end: end,
               ),
               Padding(
                 padding: const EdgeInsets.only(top: 20, left: 2, right: 2, bottom: 12),
@@ -1734,7 +1662,7 @@ class _WorkoutTypeTile extends StatelessWidget {
               Text(
                 '次',
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 22,
                   color: Colors.black.withValues(alpha: 0.6),
                   fontWeight: FontWeight.w700,
                 ),
@@ -2119,18 +2047,6 @@ class _DefaultStatsView extends StatelessWidget {
 
         final theme = Theme.of(context);
         final cardioHoursStr = (cardioMins / 60).toStringAsFixed(1);
-        final allInsight = _insightForAllTime(
-          sessionCount: sessions.length,
-          activeDays: activeDays,
-          longestStreak: longestStreak,
-          totalMins: totalMins,
-          totalCals: totalCals,
-          swimN: swimSessions.length,
-          gymN: gymSessions.length,
-          cardioN: cardioSessions.length,
-          swimKm: swimDist / 1000,
-          sportMonths: totalMonths,
-        );
 
         return ListView(
           padding: const EdgeInsets.fromLTRB(20, 10, 20, 110),
@@ -2139,13 +2055,6 @@ class _DefaultStatsView extends StatelessWidget {
               sportMonths: totalMonths,
               activeDays: activeDays,
               longestStreak: longestStreak,
-            ),
-            const SizedBox(height: 14),
-            _InsightCardNew(
-              icon: allInsight.icon,
-              title: allInsight.title,
-              description: allInsight.description,
-              score: allInsight.score,
             ),
             const SizedBox(height: 16),
             Container(
@@ -3176,110 +3085,240 @@ class _SummaryTile extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  周统计 Hero 卡片
+//  Period summary — pastel grid (week / month / year)
 // ══════════════════════════════════════════════════════════════
-class _WeekHeroCard extends StatelessWidget {
-  final int weekNum;
-  final DateTime start;
+class _PastelPeriodHeroCard extends StatelessWidget {
+  final String headlineText;
+  final String pillText;
+  /// Prepended to labels, e.g. 本周 / 本月 / 本年.
+  final String periodPrefix;
   final int sessions;
   final int totalMins;
   final int totalCals;
   final VoidCallback onDateTap;
+  final int swimCount;
+  final double swimKm;
+  final int gymCount;
+  final int gymSets;
+  final int cardioCount;
+  final int cardioMins;
 
-  const _WeekHeroCard({
-    required this.weekNum,
-    required this.start,
+  const _PastelPeriodHeroCard({
+    required this.headlineText,
+    required this.pillText,
+    required this.periodPrefix,
     required this.sessions,
     required this.totalMins,
     required this.totalCals,
     required this.onDateTap,
+    required this.swimCount,
+    required this.swimKm,
+    required this.gymCount,
+    required this.gymSets,
+    required this.cardioCount,
+    required this.cardioMins,
   });
 
-  String get _weekRange {
-    final end = start.add(const Duration(days: 6));
-    return '${start.month}/${start.day} - ${end.month}/${end.day}';
+  static String _favoriteSportLabel(int swimN, int gymN, int cardioN) {
+    if (swimN == 0 && gymN == 0 && cardioN == 0) return '暂无';
+    // Prefer swim > gym > cardio when session counts tie.
+    final ranked = [
+      (0, swimN, '游泳'),
+      (1, gymN, '健身'),
+      (2, cardioN, '有氧'),
+    ]..sort((a, b) {
+        final byCount = b.$2.compareTo(a.$2);
+        if (byCount != 0) return byCount;
+        return a.$1.compareTo(b.$1);
+      });
+    return ranked.first.$3;
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final favorite = _favoriteSportLabel(swimCount, gymCount, cardioCount);
+
+    // Pastel surfaces — softer tones (pre-vivid palette).
+    Color bgLavender() => isDark ? const Color(0xFF2A2438) : const Color(0xFFF3EEFF);
+    Color bgPink() => isDark ? const Color(0xFF362830) : const Color(0xFFFFF0F5);
+    Color bgMint() => isDark ? const Color(0xFF233530) : const Color(0xFFE8F7F0);
+    Color bgPeach() => isDark ? const Color(0xFF3A3028) : const Color(0xFFFFF4EB);
+    Color bottomLavender() => isDark ? const Color(0xFF2F2840) : const Color(0xFFF5F0FF);
+
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+
     return Container(
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF4F46E5), Color(0xFF0EA5E9)],
-        ),
-        borderRadius: BorderRadius.circular(28),
+        color: cardBg,
+        borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF4F46E5).withValues(alpha: 0.2),
+            color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.06),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 顶部行：标题 + 日期选择
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '本周概览',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.03,
-                      height: 1.2,
-                    ),
+              Expanded(
+                child: Text(
+                  headlineText,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.35,
+                    color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF172033),
                   ),
-                ],
+                ),
               ),
-              // 日期选择按钮
               GestureDetector(
                 onTap: onDateTap,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.16),
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.26)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        _weekRange,
-                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+                        pillText,
+                        style: TextStyle(
+                          color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF172033),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                      const SizedBox(width: 2),
-                      const Icon(Icons.keyboard_arrow_down, color: Colors.white70, size: 18),
+                      Icon(
+                        Icons.keyboard_arrow_down,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        size: 16,
+                      ),
                     ],
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          // Three metrics: equal horizontal stretch (full row width); gaps keep cards visually separated.
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 70,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _WeekPastelStatCard(
+                  background: bgLavender(),
+                  title: '$periodPrefix训练',
+                  titleColor: isDark ? const Color(0xFFB4A5D4) : const Color(0xFF8B7CA8),
+                  child: _WeekPastelValueRow(
+                    value: '$sessions',
+                    unit: '次',
+                    valueColor: isDark ? const Color(0xFFD4C4F5) : const Color(0xFF6B4FB8),
+                    unitColor: isDark ? const Color(0xFFAB9FD4) : const Color(0xFF8E6BC9),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _WeekPastelStatCard(
+                  background: bgPink(),
+                  title: '$periodPrefix时长',
+                  titleColor: isDark ? const Color(0xFFD4A0A8) : const Color(0xFFE8A0A8),
+                  child: _WeekPastelValueRow(
+                    value: '$totalMins',
+                    unit: '分钟',
+                    valueColor: isDark ? const Color(0xFFFFB4C4) : const Color(0xFFE85D75),
+                    unitColor: isDark ? const Color(0xFFFF9EAE) : const Color(0xFFEA6B84),
+                  ),
+                ),
+              ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 70,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _WeekPastelStatCard(
+                  background: bgMint(),
+                  title: '$periodPrefix最爱运动',
+                  titleColor: isDark ? const Color(0xFF8FC4AE) : const Color(0xFF7AB8A0),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      favorite,
+                      style: TextStyle(
+                        fontSize: favorite.length >= 3 ? 19 : 21,
+                        fontWeight: FontWeight.w800,
+                        height: 1.05,
+                        color: isDark ? const Color(0xFF6EE7C5) : const Color(0xFF0D7A5F),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _WeekPastelStatCard(
+                  background: bgPeach(),
+                  title: '$periodPrefix消耗热量',
+                  titleColor: isDark ? const Color(0xFFD4B896) : const Color(0xFFC9A080),
+                  child: _WeekPastelValueRow(
+                    value: '$totalCals',
+                    unit: '千卡',
+                    valueColor: isDark ? const Color(0xFFFFB07A) : const Color(0xFFFF7A3D),
+                    unitColor: isDark ? const Color(0xFFFFA060) : const Color(0xFFFF8F50),
+                  ),
+                ),
+              ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
-                child: _HeroMetricNew(value: '$sessions', label: '训练次数'),
+                child: _WeekPastelSportCard(
+                  background: bottomLavender(),
+                  emoji: '🏊',
+                  label: '游泳',
+                  countLabel: '$swimCount次',
+                  subLabel: '${swimKm.toStringAsFixed(1)}km',
+                  isDark: isDark,
+                ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 6),
               Expanded(
-                child: _HeroMetricNew(value: '$totalMins', label: '总分钟'),
+                child: _WeekPastelSportCard(
+                  background: bottomLavender(),
+                  emoji: '🏋️',
+                  label: '健身',
+                  countLabel: '$gymCount次',
+                  subLabel: '$gymSets组',
+                  isDark: isDark,
+                ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 6),
               Expanded(
-                child: _HeroMetricNew(value: '$totalCals', label: '千卡'),
+                child: _WeekPastelSportCard(
+                  background: bottomLavender(),
+                  emoji: '❤️',
+                  label: '有氧',
+                  countLabel: '$cardioCount次',
+                  subLabel: '$cardioMins分钟',
+                  isDark: isDark,
+                ),
               ),
             ],
           ),
@@ -3289,7 +3328,157 @@ class _WeekHeroCard extends StatelessWidget {
   }
 }
 
-/// Month/year overview hero — same visual language as [_WeekHeroCard] (preview: stats-ui-preview.html).
+class _WeekPastelStatCard extends StatelessWidget {
+  final Color background;
+  final String title;
+  final Color titleColor;
+  final Widget child;
+
+  const _WeekPastelStatCard({
+    required this.background,
+    required this.title,
+    required this.titleColor,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.max,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: titleColor, height: 1.2),
+          ),
+          const SizedBox(height: 6),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _WeekPastelValueRow extends StatelessWidget {
+  final String value;
+  final String unit;
+  final Color valueColor;
+  final Color unitColor;
+
+  const _WeekPastelValueRow({
+    required this.value,
+    required this.unit,
+    required this.valueColor,
+    required this.unitColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            height: 1.0,
+            letterSpacing: -0.6,
+            color: valueColor,
+          ),
+        ),
+        const SizedBox(width: 3),
+        Text(
+          unit,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: unitColor,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _WeekPastelSportCard extends StatelessWidget {
+  final Color background;
+  final String emoji;
+  final String label;
+  final String countLabel;
+  final String subLabel;
+  final bool isDark;
+
+  const _WeekPastelSportCard({
+    required this.background,
+    required this.emoji,
+    required this.label,
+    required this.countLabel,
+    required this.subLabel,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final purple = isDark ? const Color(0xFFC4B5FD) : const Color(0xFF7C5CB8);
+    final purpleBold = isDark ? const Color(0xFFE9E0FF) : const Color(0xFF5B3FA8);
+    final sub = isDark ? const Color(0xFF9CA3AF) : const Color(0xFF9B8AB8);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 20)),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: purple),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            countLabel,
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: purpleBold),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subLabel,
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: sub),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Legacy month/year hero layout — superseded by [_PastelPeriodHeroCard] for stats tabs (preview: stats-ui-preview.html).
 class _OverviewHeroCard extends StatelessWidget {
   final String headline;
   final String datePillText;
@@ -3311,15 +3500,11 @@ class _OverviewHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF4F46E5), Color(0xFF0EA5E9)],
-        ),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF4F46E5).withValues(alpha: 0.2),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -3336,7 +3521,7 @@ class _OverviewHeroCard extends StatelessWidget {
                 child: Text(
                   headline,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFF172033),
                     fontSize: 24,
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.03,
@@ -3349,9 +3534,8 @@ class _OverviewHeroCard extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.16),
+                    color: const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.26)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -3359,13 +3543,13 @@ class _OverviewHeroCard extends StatelessWidget {
                       Flexible(
                         child: Text(
                           datePillText,
-                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+                          style: const TextStyle(color: Color(0xFF172033), fontSize: 12, fontWeight: FontWeight.w700),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const SizedBox(width: 2),
-                      const Icon(Icons.keyboard_arrow_down, color: Colors.white70, size: 18),
+                      const Icon(Icons.keyboard_arrow_down, color: Color(0xFF64748B), size: 18),
                     ],
                   ),
                 ),
@@ -3373,14 +3557,17 @@ class _OverviewHeroCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(child: _HeroMetricNew(value: '$sessions', label: '训练次数')),
-              const SizedBox(width: 12),
-              Expanded(child: _HeroMetricNew(value: '$totalMins', label: '总分钟')),
-              const SizedBox(width: 12),
-              Expanded(child: _HeroMetricNew(value: '$totalCals', label: '千卡')),
-            ],
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Row(
+              children: [
+                Expanded(child: _HeroMetricNew(value: '$sessions', label: '训练次数')),
+                const SizedBox(width: 12),
+                Expanded(child: _HeroMetricNew(value: '$totalMins', label: '总分钟')),
+                const SizedBox(width: 12),
+                Expanded(child: _HeroMetricNew(value: '$totalCals', label: '千卡')),
+              ],
+            ),
           ),
         ],
       ),
@@ -3404,15 +3591,11 @@ class _AllTimeHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF4F46E5), Color(0xFF0EA5E9)],
-        ),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF4F46E5).withValues(alpha: 0.2),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -3425,7 +3608,7 @@ class _AllTimeHeroCard extends StatelessWidget {
           const Text(
             '全部记录',
             style: TextStyle(
-              color: Colors.white,
+              color: Color(0xFF172033),
               fontSize: 24,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.03,
@@ -3435,11 +3618,11 @@ class _AllTimeHeroCard extends StatelessWidget {
           const SizedBox(height: 20),
           Row(
             children: [
-              Expanded(child: _HeroMetricNew(value: '$sportMonths', label: '已运动 · 月')),
+              Expanded(child: _HeroMetricNew(value: '$sportMonths', label: '已运动 · 月', largeValue: true)),
               const SizedBox(width: 12),
-              Expanded(child: _HeroMetricNew(value: '$activeDays', label: '已坚持 · 天')),
+              Expanded(child: _HeroMetricNew(value: '$activeDays', label: '已坚持 · 天', largeValue: true)),
               const SizedBox(width: 12),
-              Expanded(child: _HeroMetricNew(value: '$longestStreak', label: '最长连续打卡')),
+              Expanded(child: _HeroMetricNew(value: '$longestStreak', label: '最长连续打卡', largeValue: true)),
             ],
           ),
         ],
@@ -3541,50 +3724,49 @@ class _AllTimeStatCell extends StatelessWidget {
 class _HeroMetricNew extends StatelessWidget {
   final String value;
   final String label;
+  /// Larger numerals for all-time stats hero (only).
+  final bool largeValue;
 
-  const _HeroMetricNew({required this.value, required this.label});
+  const _HeroMetricNew({required this.value, required this.label, this.largeValue = false});
 
   @override
   Widget build(BuildContext context) {
+    final valueSize = largeValue ? 30.0 : 22.0;
+    const labelSize = 12.0;
+    final letter = largeValue ? -0.6 : -0.03;
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-      ),
+      padding: EdgeInsets.symmetric(horizontal: 4, vertical: largeValue ? 8 : 6),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
-            width: double.infinity,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.center,
-              child: Text(
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
                 value,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
+                style: TextStyle(
+                  color: const Color(0xFF4F46E5),
+                  fontSize: valueSize,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: -0.03,
+                  letterSpacing: letter,
+                  height: 1.05,
                 ),
-                textAlign: TextAlign.center,
-                maxLines: 1,
               ),
-            ),
+            ],
           ),
-          const SizedBox(height: 2),
+          SizedBox(height: largeValue ? 6 : 4),
           Text(
             label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.72),
-              fontSize: 12,
+            style: const TextStyle(
+              color: Color(0xFF64748B),
+              fontSize: labelSize,
             ),
+            textAlign: TextAlign.center,
+            maxLines: 2,
           ),
         ],
       ),
@@ -3668,7 +3850,7 @@ class _InsightCardNew extends StatelessWidget {
             score,
             style: const TextStyle(
               color: Color(0xFF14B8A6),
-              fontSize: 18,
+              fontSize: 22,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -3804,17 +3986,17 @@ class _KeyMetricCard extends StatelessWidget {
                 Text(
                   '${item.count}',
                   style: const TextStyle(
-                    fontSize: 30,
+                    fontSize: 24,
                     fontWeight: FontWeight.bold,
                     letterSpacing: -0.03,
-                    color: Color(0xFF172033),
+                    color: Color(0xFF4F46E5),
                   ),
                 ),
                 const SizedBox(width: 4),
                 Text(
                   '次',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 14,
                     color: Colors.black.withValues(alpha: 0.6),
                     fontWeight: FontWeight.w700,
                   ),
@@ -4090,11 +4272,6 @@ class _WeekHeatmapGrid extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '本周运动分布',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 12),
           // 热力网格 - dailyCalories 的 key 是周内第几天（周一=0，周日=6）
           SizedBox(
             height: 44,
