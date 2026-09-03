@@ -2429,30 +2429,39 @@ class _ActivityChart extends StatelessWidget {
           return _bar(i, count.toDouble());
         });
       case _Period.month:
-        // 按自然周（周一到周日）划分
+        // Split the month into Mon–Sun weeks for bar positions, but only sum
+        // minutes on days that fall inside this month (exclude adjacent-month spillover).
         final firstDayOfMonth = DateTime(start.year, start.month, 1);
-        // 找到本月第一周的周一（可能在月初之前）
+        // Monday of the week that contains the 1st (may be before the month)
         final daysFromMonday = firstDayOfMonth.weekday - 1; // 0=Mon, 6=Sun
         final firstMonday = daysFromMonday == 0
             ? firstDayOfMonth
             : firstDayOfMonth.subtract(Duration(days: daysFromMonday));
 
-        // 找到本月最后一周的周日（可能在月后）
         final lastDayOfMonth = DateTime(start.year, start.month + 1, 0);
         final daysToSunday = 7 - lastDayOfMonth.weekday;
         final lastSunday = lastDayOfMonth.add(
             Duration(days: daysToSunday == 7 ? 0 : daysToSunday));
 
-        // 计算周数
         final totalDays = lastSunday.difference(firstMonday).inDays + 1;
         final weeks = (totalDays / 7).ceil();
 
         return List.generate(weeks, (i) {
           final wStart = firstMonday.add(Duration(days: i * 7));
           final wEnd = wStart.add(const Duration(days: 6));
-          final mins = provider.sessionsInPeriod(wStart, wEnd).where((e) => e.countsAsWorkout).fold<int>(
+          final clipStart =
+              wStart.isBefore(firstDayOfMonth) ? firstDayOfMonth : wStart;
+          final clipEnd = wEnd.isAfter(lastDayOfMonth) ? lastDayOfMonth : wEnd;
+          if (clipStart.isAfter(clipEnd)) {
+            return _bar(i, 0);
+          }
+          final mins = provider
+              .sessionsInPeriod(clipStart, clipEnd)
+              .where((e) => e.countsAsWorkout)
+              .fold<int>(
                 0,
-                (sum, s) => sum + (s.durationMinutes ?? s.durationSeconds ~/ 60),
+                (sum, s) =>
+                    sum + (s.durationMinutes ?? s.durationSeconds ~/ 60),
               );
           return _bar(i, mins.toDouble());
         });

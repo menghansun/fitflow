@@ -3,6 +3,7 @@ import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 import '../models/workout_session.dart';
 import '../services/supabase_service.dart';
+import '../utils/db_datetime.dart';
 
 class WorkoutProvider extends ChangeNotifier {
   final Uuid _uuid = const Uuid();
@@ -151,9 +152,9 @@ class WorkoutProvider extends ChangeNotifier {
   List<WorkoutSession> getSessionsForDate(DateTime date) {
     final day = DateTime(date.year, date.month, date.day);
     return _sessions.where((s) {
-      final start = DateTime(s.date.year, s.date.month, s.date.day);
+      final start = calendarDayLocal(s.date);
       if (s.endDate != null) {
-        final end = DateTime(s.endDate!.year, s.endDate!.month, s.endDate!.day);
+        final end = calendarDayLocal(s.endDate!);
         return !day.isBefore(start) && !day.isAfter(end);
       }
       return start == day;
@@ -162,18 +163,21 @@ class WorkoutProvider extends ChangeNotifier {
 
   List<WorkoutSession> getSessionsForMonth(int year, int month) {
     return _sessions
-        .where((s) => s.date.year == year && s.date.month == month)
+        .where((s) {
+          final d = calendarDayLocal(s.date);
+          return d.year == year && d.month == month;
+        })
         .toList();
   }
 
   Map<DateTime, List<WorkoutSession>> getSessionsByDay(
       DateTime start, DateTime end) {
     final Map<DateTime, List<WorkoutSession>> result = {};
-    // Normalize to include full end day (23:59:59)
-    final endOfDay = DateTime(end.year, end.month, end.day, 23, 59, 59);
+    final startDay = DateTime(start.year, start.month, start.day);
+    final endDay = DateTime(end.year, end.month, end.day);
     for (final s in _sessions) {
-      if (s.date.isBefore(start) || s.date.isAfter(endOfDay)) continue;
-      final day = DateTime(s.date.year, s.date.month, s.date.day);
+      final day = calendarDayLocal(s.date);
+      if (day.isBefore(startDay) || day.isAfter(endDay)) continue;
       (result[day] ??= []).add(s);
     }
     return result;
@@ -195,8 +199,7 @@ class WorkoutProvider extends ChangeNotifier {
     final startDate = DateTime(start.year, start.month, start.day);
     final endDateTime = DateTime(end.year, end.month, end.day, 23, 59, 59);
     final result = _sessions.where((s) {
-      // Compare only date components (year, month, day) to avoid timezone issues
-      final sessionDate = DateTime(s.date.year, s.date.month, s.date.day);
+      final sessionDate = calendarDayLocal(s.date);
       final before = !sessionDate.isBefore(startDate);
       final after = !sessionDate.isAfter(endDateTime);
       return before && after && s.countsAsWorkout;
@@ -226,10 +229,7 @@ class WorkoutProvider extends ChangeNotifier {
     var day = DateTime(now.year, now.month, now.day);
     while (true) {
       final hasSessions = _sessions.any((s) =>
-          s.countsAsWorkout &&
-          s.date.year == day.year &&
-          s.date.month == day.month &&
-          s.date.day == day.day);
+          s.countsAsWorkout && calendarDayLocal(s.date) == day);
       if (!hasSessions) break;
       streak++;
       day = day.subtract(const Duration(days: 1));

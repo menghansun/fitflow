@@ -1,12 +1,33 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/workout_session.dart';
 import '../../providers/workout_provider.dart';
+import '../../utils/db_datetime.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/session_card.dart';
 import '../session_detail_screen.dart';
+
+/// Whether [s] should contribute to the focused calendar month (local wall calendar).
+bool _sessionOverlapsCalendarMonth(
+  WorkoutSession s,
+  int year,
+  int month,
+) {
+  if (s.type == WorkoutType.other && s.endDate != null) {
+    var cur = calendarDayLocal(s.date);
+    final end = calendarDayLocal(s.endDate!);
+    while (!cur.isAfter(end)) {
+      if (cur.year == year && cur.month == month) return true;
+      cur = cur.add(const Duration(days: 1));
+    }
+    return false;
+  }
+  final d = calendarDayLocal(s.date);
+  return d.year == year && d.month == month;
+}
 
 class CalendarScreen extends StatefulWidget {
   final ValueChanged<DateTime>? onDaySelected;
@@ -201,10 +222,60 @@ class _CalendarScreenState extends State<CalendarScreen> {
           final monthEnd = DateTime(
               _focusedMonth.year, _focusedMonth.month + 1, 0, 23, 59, 59);
           final monthSessions = provider.sessions
-              .where((s) =>
-                  !s.date.isBefore(_focusedMonth) &&
-                  !s.date.isAfter(monthEnd))
+              .where((s) => _sessionOverlapsCalendarMonth(
+                    s,
+                    _focusedMonth.year,
+                    _focusedMonth.month,
+                  ))
               .toList();
+
+          if (kDebugMode) {
+            final fy = _focusedMonth.year;
+            final fm = _focusedMonth.month;
+            debugPrint(
+              '[Calendar] focused=$_focusedMonth monthEnd=$monthEnd selected=$_selectedDay',
+            );
+            for (final s in provider.sessions) {
+              final loc = s.date.toLocal();
+              final localDay =
+                  DateTime(loc.year, loc.month, loc.day);
+              final keyFromComponents =
+                  DateTime(s.date.year, s.date.month, s.date.day);
+              final inInstantMonth = !s.date.isBefore(_focusedMonth) &&
+                  !s.date.isAfter(monthEnd);
+              final inOverlapMonth = _sessionOverlapsCalendarMonth(s, fy, fm);
+              if (inInstantMonth != inOverlapMonth) {
+                debugPrint(
+                  '[Calendar] MISMATCH instantVsOverlap id=${s.id} type=${s.type} '
+                  'raw=${s.date} isUtc=${s.date.isUtc} '
+                  'localDay=$localDay calendarDayLocal=${calendarDayLocal(s.date)} '
+                  'naiveYmd=$keyFromComponents '
+                  'inInstantMonth=$inInstantMonth inOverlapMonth=$inOverlapMonth '
+                  'mins=${s.durationInMinutes} kcal=${s.calories ?? 0}',
+                );
+              }
+            }
+            final selected =
+                provider.getSessionsForDate(_selectedDay);
+            debugPrint(
+              '[Calendar] getSessionsForDate(selected): count=${selected.length} '
+              'ids=${selected.map((e) => e.id).join(",")}',
+            );
+            for (final s in selected) {
+              final loc = s.date.toLocal();
+              debugPrint(
+                '[Calendar]   └ session id=${s.id} type=${s.type} '
+                'raw=${s.date} isUtc=${s.date.isUtc} '
+                'localWall=${loc.year}-${loc.month}-${loc.day} '
+                '${loc.hour.toString().padLeft(2, "0")}:'
+                '${loc.minute.toString().padLeft(2, "0")}',
+              );
+            }
+            debugPrint(
+              '[Calendar] monthSessions: count=${monthSessions.length} '
+              'ids=${monthSessions.map((e) => e.id).join(",")}',
+            );
+          }
           // 同时把本月内其他类型跨天活动也纳入（可能 startDate 在上月）
           final allSessions = provider.sessions;
           final eventMap = <DateTime, List<WorkoutSession>>{};
@@ -227,6 +298,67 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 eventMap.putIfAbsent(cur, () => []).add(s);
               }
               cur = cur.add(const Duration(days: 1));
+            }
+          }
+          if (kDebugMode) {
+            final fy = _focusedMonth.year;
+            final fm = _focusedMonth.month;
+            final keys = eventMap.keys
+                .where((k) => k.year == fy && k.month == fm)
+                .toList()
+              ..sort();
+            debugPrint(
+              '[Calendar] eventMap keys (y=$fy m=$fm): $keys',
+            );
+            for (final e in eventMap.entries) {
+              if (e.key.year != fy || e.key.month != fm) continue;
+              final ids = e.value.map((s) => s.id).join(',');
+              debugPrint(
+                '[Calendar]   cell ${e.key.year}-${e.key.month}-${e.key.day}: '
+                '${e.value.length} session(s) ids=$ids',
+              );
+            }
+            final idsMonth = monthSessions.map((s) => s.id).toSet();
+            final idsGrid = <String>{};
+            for (final e in eventMap.entries) {
+              if (e.key.year != fy || e.key.month != fm) continue;
+              for (final s in e.value) {
+                idsGrid.add(s.id);
+              }
+            }
+            final onlyMonth = idsMonth.difference(idsGrid);
+            final onlyGrid = idsGrid.difference(idsMonth);
+            if (onlyMonth.isNotEmpty || onlyGrid.isNotEmpty) {
+              debugPrint(
+                '[Calendar] ID_SET_DIFF onlyInMonthSessions=$onlyMonth '
+                'onlyOnGrid=$onlyGrid',
+              );
+              for (final id in onlyMonth) {
+                final s = monthSessions.firstWhere((x) => x.id == id);
+                debugPrint(
+                  '[Calendar] ORPHAN_DETAIL id=$id type=${s.type} '
+                  'raw=${s.date} isUtc=${s.date.isUtc} '
+                  'calendarDayLocal=${calendarDayLocal(s.date)} '
+                  'naiveYmd=${DateTime(s.date.year, s.date.month, s.date.day)}',
+                );
+              }
+            }
+            for (final s in monthSessions) {
+              if (s.type == WorkoutType.other && s.endDate != null) continue;
+              final locKey = calendarDayLocal(s.date);
+              final naiveKey =
+                  DateTime(s.date.year, s.date.month, s.date.day);
+              final mapKeyUsed = naiveKey;
+              if (locKey != naiveKey ||
+                  locKey.year != fy ||
+                  locKey.month != fm) {
+                debugPrint(
+                  '[Calendar] KEY_ROW id=${s.id} type=${s.type} '
+                  'raw=${s.date} isUtc=${s.date.isUtc} '
+                  'locKey=$locKey naiveKey=$naiveKey mapUses=$mapKeyUsed '
+                  'locInFocused=${locKey.year == fy && locKey.month == fm}',
+                );
+              }
             }
           }
           final totalMins = monthSessions.fold<int>(

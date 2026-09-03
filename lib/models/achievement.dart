@@ -45,6 +45,8 @@ enum AchievementType {
 
   // 泳姿类
   freestyleUnlocked,  // 解锁自由泳
+  breaststroke30,    // 同次记录蛙泳累计≥1000m 且整场≤30 分钟
+  freestyle30,       // 同次记录自由泳累计≥1000m 且整场≤30 分钟
 }
 
 @HiveType(typeId: 10)
@@ -134,6 +136,10 @@ class Achievement extends HiveObject {
       // 泳姿
       case AchievementType.freestyleUnlocked:
         return '自由泳选手';
+      case AchievementType.breaststroke30:
+        return '蛙泳进30分钟';
+      case AchievementType.freestyle30:
+        return '自由泳进30分钟';
     }
   }
 
@@ -198,6 +204,10 @@ class Achievement extends HiveObject {
       // 泳姿
       case AchievementType.freestyleUnlocked:
         return '解锁自由泳';
+      case AchievementType.breaststroke30:
+        return '单次累计≥1000米，且整场时长不超过30分钟';
+      case AchievementType.freestyle30:
+        return '单次累计≥1000米，且整场时长不超过30分钟';
     }
   }
 
@@ -247,6 +257,10 @@ class Achievement extends HiveObject {
         return '🏅';
       // 泳姿
       case AchievementType.freestyleUnlocked:
+        return '🏊';
+      case AchievementType.breaststroke30:
+        return '🐸';
+      case AchievementType.freestyle30:
         return '🏊';
     }
   }
@@ -312,6 +326,10 @@ class Achievement extends HiveObject {
       // 泳姿
       case AchievementType.freestyleUnlocked:
         return '喝饱了吧~~~！🏊';
+      case AchievementType.breaststroke30:
+        return '千米蛙泳半小时内搞定！腿蹬得比青蛙还标准！🐸';
+      case AchievementType.freestyle30:
+        return '千米自由泳半小时内搞定！划水已经划出心流了！🏊';
     }
   }
 
@@ -355,6 +373,8 @@ class Achievement extends HiveObject {
       case AchievementType.allRounder:
         return 5;
       case AchievementType.freestyleUnlocked:
+      case AchievementType.breaststroke30:
+      case AchievementType.freestyle30:
         return 1;
     }
   }
@@ -389,6 +409,8 @@ class AchievementDefinition {
       case AchievementType.swimDistance50:
       case AchievementType.swimDistance100:
       case AchievementType.freestyleUnlocked:
+      case AchievementType.breaststroke30:
+      case AchievementType.freestyle30:
         return categorySwim;
       // 健身
       case AchievementType.gymFirst:

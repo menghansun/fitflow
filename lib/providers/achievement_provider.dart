@@ -160,6 +160,29 @@ class AchievementProvider extends ChangeNotifier {
     }
     await update(AchievementType.freestyleUnlocked, hasFreestyle ? 1 : 0);
 
+    bool meetsStyleKmIn30(
+      SwimStyle style,
+    ) {
+      for (final session in swimSessions) {
+        if (session.swimSets == null) continue;
+        if (session.durationInMinutes > 30) continue;
+        final meters = session.swimSets!
+            .where((set) => set.style == style)
+            .fold<int>(0, (sum, set) => sum + set.distanceMeters);
+        if (meters >= 1000) return true;
+      }
+      return false;
+    }
+
+    await update(
+      AchievementType.breaststroke30,
+      meetsStyleKmIn30(SwimStyle.breaststroke) ? 1 : 0,
+    );
+    await update(
+      AchievementType.freestyle30,
+      meetsStyleKmIn30(SwimStyle.freestyle) ? 1 : 0,
+    );
+
     return newlyUnlocked;
   }
 
@@ -255,6 +278,28 @@ class AchievementProvider extends ChangeNotifier {
           final sets = s.swimSets;
           if (s.type != WorkoutType.swim || !s.countsAsWorkout || sets == null) return false;
           return sets.any((set) => set.style == SwimStyle.freestyle);
+        });
+      case AchievementType.breaststroke30:
+        return _findSingleSessionDate(sessionsAsc, (s) {
+          if (s.type != WorkoutType.swim || !s.countsAsWorkout || s.swimSets == null) {
+            return false;
+          }
+          if (s.durationInMinutes > 30) return false;
+          final meters = s.swimSets!
+              .where((set) => set.style == SwimStyle.breaststroke)
+              .fold<int>(0, (sum, set) => sum + set.distanceMeters);
+          return meters >= 1000;
+        });
+      case AchievementType.freestyle30:
+        return _findSingleSessionDate(sessionsAsc, (s) {
+          if (s.type != WorkoutType.swim || !s.countsAsWorkout || s.swimSets == null) {
+            return false;
+          }
+          if (s.durationInMinutes > 30) return false;
+          final meters = s.swimSets!
+              .where((set) => set.style == SwimStyle.freestyle)
+              .fold<int>(0, (sum, set) => sum + set.distanceMeters);
+          return meters >= 1000;
         });
     }
   }
