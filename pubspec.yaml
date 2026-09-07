@@ -1,7 +1,7 @@
 name: fitflow
 description: A fitness and swimming tracking app
 publish_to: 'none'
-version: 1.0.0+1
+version: 2.1.0+2
 
 environment:
   sdk: '>=3.7.0 <4.0.0'
@@ -65,5 +65,7 @@ flutter:
     - assets/splash.gif
     - assets/achievement/
     - assets/legal/
+    - assets/swimmers/breaststroke_blue/sprite_sheet.png
+    - assets/swimmers/breaststroke_orange/sprite_sheet.png
     - assets/body_front.jpeg
     - assets/body_back.jpeg

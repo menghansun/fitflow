@@ -365,6 +365,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
               0, (acc, s) => acc + s.durationInMinutes);
           final totalCals = monthSessions.fold<int>(
               0, (acc, s) => acc + (s.calories ?? 0));
+          final completedWorkoutCount =
+              provider.sessions.where((s) => s.countsAsWorkout).length;
+          final currentStreak = provider.currentStreak;
 
           return CustomScrollView(
             slivers: [
@@ -395,6 +398,48 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         setState(() => _selectedDay = day);
                         widget.onDaySelected?.call(day);
                       },
+                  ),
+                ),
+              ),
+
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 2),
+                  child: Center(
+                    child: Text.rich(
+                      TextSpan(
+                        style: TextStyle(
+                          color:
+                              theme.textTheme.bodyMedium?.color?.withValues(
+                                alpha: 0.52,
+                              ),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        children: [
+                          const TextSpan(text: '已完成 '),
+                          TextSpan(
+                            text: '$completedWorkoutCount',
+                            style: TextStyle(
+                              color: primary,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const TextSpan(text: ' 次训练，已连续 '),
+                          TextSpan(
+                            text: '$currentStreak',
+                            style: TextStyle(
+                              color: primary,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const TextSpan(text: ' 天训练'),
+                        ],
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ),
               ),

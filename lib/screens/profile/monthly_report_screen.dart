@@ -1,7 +1,9 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
 import 'package:path_provider/path_provider.dart';
@@ -13,6 +15,23 @@ import '../../providers/workout_provider.dart';
 // Swim accent colors
 const _swimPrimary = Color(0xFF00D4FF);
 const _swimLight = Color(0xFFE0F7FF);
+const _breaststrokeOrangeSpriteAsset =
+    'assets/swimmers/breaststroke_orange/sprite_sheet.png';
+const _breaststrokeBlueSpriteAsset =
+    'assets/swimmers/breaststroke_blue/sprite_sheet.png';
+const _swimmerSpriteFrameCount = 5;
+const _swimmerStrokeCycleMilliseconds = 1200;
+
+Future<ui.Image> _loadUiImageAsset(String assetPath) async {
+  final data = await rootBundle.load(assetPath);
+  final bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+  final codec = await ui.instantiateImageCodec(bytes);
+  try {
+    return (await codec.getNextFrame()).image;
+  } finally {
+    codec.dispose();
+  }
+}
 
 class _SwimMilestone {
   final String emoji;
@@ -33,11 +52,36 @@ class _SwimMilestone {
 List<_SwimMilestone> _computeMilestones(List<WorkoutSession> allSwimSessions) {
   if (allSwimSessions.isEmpty) {
     return [
-      const _SwimMilestone(emoji: '🐣', title: '首次下泳池', value: '0km', achieved: false),
-      const _SwimMilestone(emoji: '🏅', title: '累计1公里', value: '0/1km', achieved: false),
-      const _SwimMilestone(emoji: '🎯', title: '累计10公里', value: '0/10km', achieved: false),
-      const _SwimMilestone(emoji: '🔥', title: '累计50公里', value: '0/50km', achieved: false),
-      const _SwimMilestone(emoji: '👑', title: '累计100公里', value: '0/100km', achieved: false),
+      const _SwimMilestone(
+        emoji: '🐣',
+        title: '首次下泳池',
+        value: '0km',
+        achieved: false,
+      ),
+      const _SwimMilestone(
+        emoji: '🏅',
+        title: '累计1公里',
+        value: '0/1km',
+        achieved: false,
+      ),
+      const _SwimMilestone(
+        emoji: '🎯',
+        title: '累计10公里',
+        value: '0/10km',
+        achieved: false,
+      ),
+      const _SwimMilestone(
+        emoji: '🔥',
+        title: '累计50公里',
+        value: '0/50km',
+        achieved: false,
+      ),
+      const _SwimMilestone(
+        emoji: '👑',
+        title: '累计100公里',
+        value: '0/100km',
+        achieved: false,
+      ),
     ];
   }
 
@@ -54,7 +98,8 @@ List<_SwimMilestone> _computeMilestones(List<WorkoutSession> allSwimSessions) {
     totalDistMeters += dist;
 
     if (dist > 0 && s.durationInMinutes > 0) {
-      final paceSec = ((s.durationInMinutes / (dist / 100)).round() * 60).round();
+      final paceSec =
+          ((s.durationInMinutes / (dist / 100)).round() * 60).round();
       if (paceSec < bestPaceSec && paceSec > 0) {
         bestPaceSec = paceSec;
         bestPaceDate = s.date;
@@ -67,13 +112,15 @@ List<_SwimMilestone> _computeMilestones(List<WorkoutSession> allSwimSessions) {
   final milestones = <_SwimMilestone>[];
   final km = totalDistMeters / 1000;
 
-  milestones.add(_SwimMilestone(
-    emoji: '🐣',
-    title: '首次下泳池',
-    value: '${(km).toStringAsFixed(1)}km',
-    achievedAt: firstSwimDate,
-    achieved: true,
-  ));
+  milestones.add(
+    _SwimMilestone(
+      emoji: '🐣',
+      title: '首次下泳池',
+      value: '${(km).toStringAsFixed(1)}km',
+      achievedAt: firstSwimDate,
+      achieved: true,
+    ),
+  );
 
   for (final target in [1.0, 5.0, 10.0, 50.0, 100.0, 200.0, 500.0]) {
     final achieved = km >= target;
@@ -88,25 +135,32 @@ List<_SwimMilestone> _computeMilestones(List<WorkoutSession> allSwimSessions) {
         }
       }
     }
-    milestones.add(_SwimMilestone(
-      emoji: achieved ? '🏅' : '🔒',
-      title: '累计${target.toInt()}公里',
-      value: achieved ? '${km.toStringAsFixed(1)}km' : '${km.toStringAsFixed(1)}/${target.toInt()}km',
-      achievedAt: achievedAt,
-      achieved: achieved,
-    ));
+    milestones.add(
+      _SwimMilestone(
+        emoji: achieved ? '🏅' : '🔒',
+        title: '累计${target.toInt()}公里',
+        value:
+            achieved
+                ? '${km.toStringAsFixed(1)}km'
+                : '${km.toStringAsFixed(1)}/${target.toInt()}km',
+        achievedAt: achievedAt,
+        achieved: achieved,
+      ),
+    );
   }
 
   if (bestPaceSec < 999999) {
     final min = bestPaceSec ~/ 60;
     final sec = bestPaceSec % 60;
-    milestones.add(_SwimMilestone(
-      emoji: '⚡',
-      title: '最快配速',
-      value: "$min'${sec.toString().padLeft(2, '0')}/百米",
-      achievedAt: bestPaceDate,
-      achieved: true,
-    ));
+    milestones.add(
+      _SwimMilestone(
+        emoji: '⚡',
+        title: '最快配速',
+        value: "$min'${sec.toString().padLeft(2, '0')}/百米",
+        achievedAt: bestPaceDate,
+        achieved: true,
+      ),
+    );
   }
 
   return milestones;
@@ -117,7 +171,12 @@ class MonthlyReportScreen extends StatefulWidget {
   final int month;
   final String userId;
 
-  const MonthlyReportScreen({super.key, required this.year, required this.month, required this.userId});
+  const MonthlyReportScreen({
+    super.key,
+    required this.year,
+    required this.month,
+    required this.userId,
+  });
 
   @override
   State<MonthlyReportScreen> createState() => _MonthlyReportScreenState();
@@ -149,22 +208,28 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
       final provider = context.read<WorkoutProvider>();
 
       // Current month
-      final sessions = provider.getSessionsForMonth(_year, _month)
-          .where((s) => s.type == WorkoutType.swim && s.countsAsWorkout)
-          .toList();
+      final sessions =
+          provider
+              .getSessionsForMonth(_year, _month)
+              .where((s) => s.type == WorkoutType.swim && s.countsAsWorkout)
+              .toList();
       sessions.sort((a, b) => a.date.compareTo(b.date));
 
       // Previous month for comparison
       final prevMonth = _month == 1 ? 12 : _month - 1;
       final prevYear = _month == 1 ? _year - 1 : _year;
-      final prevSessions = provider.getSessionsForMonth(prevYear, prevMonth)
-          .where((s) => s.type == WorkoutType.swim && s.countsAsWorkout)
-          .toList();
+      final prevSessions =
+          provider
+              .getSessionsForMonth(prevYear, prevMonth)
+              .where((s) => s.type == WorkoutType.swim && s.countsAsWorkout)
+              .toList();
 
       // All swim sessions for milestones
-      final allSwim = provider.sessions
-          .where((s) => s.type == WorkoutType.swim && s.countsAsWorkout)
-          .toList();
+      final allSwim =
+          provider.sessions
+              .where((s) => s.type == WorkoutType.swim && s.countsAsWorkout)
+              .toList()
+            ..sort((a, b) => a.date.compareTo(b.date));
       final milestones = _computeMilestones(allSwim);
 
       if (mounted) {
@@ -185,7 +250,8 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
   Future<void> _showMonthPicker() async {
     final result = await showDialog<DateTime>(
       context: context,
-      builder: (ctx) => _MonthPickerDialog(initialYear: _year, initialMonth: _month),
+      builder:
+          (ctx) => _MonthPickerDialog(initialYear: _year, initialMonth: _month),
     );
     if (result != null && mounted) {
       setState(() {
@@ -202,58 +268,64 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
     final result = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 8),
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
+      builder:
+          (ctx) => Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
               ),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF00D4FF).withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
+            ),
+            child: SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                  child: const Icon(Icons.save_alt, color: Color(0xFF00D4FF)),
-                ),
-                title: const Text('保存到相册'),
-                subtitle: const Text('将报告图片保存到手机相册'),
-                onTap: () => Navigator.pop(ctx, 'save'),
-              ),
-              ListTile(
-                leading: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF6B5EE6).withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
+                  const SizedBox(height: 16),
+                  ListTile(
+                    leading: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00D4FF).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.save_alt,
+                        color: Color(0xFF00D4FF),
+                      ),
+                    ),
+                    title: const Text('保存到相册'),
+                    subtitle: const Text('将报告图片保存到手机相册'),
+                    onTap: () => Navigator.pop(ctx, 'save'),
                   ),
-                  child: const Icon(Icons.share, color: Color(0xFF6B5EE6)),
-                ),
-                title: const Text('分享图片'),
-                subtitle: const Text('通过微信、QQ等分享报告图片'),
-                onTap: () => Navigator.pop(ctx, 'share'),
+                  ListTile(
+                    leading: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6B5EE6).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.share, color: Color(0xFF6B5EE6)),
+                    ),
+                    title: const Text('分享图片'),
+                    subtitle: const Text('通过微信、QQ等分享报告图片'),
+                    onTap: () => Navigator.pop(ctx, 'share'),
+                  ),
+                  const SizedBox(height: 8),
+                ],
               ),
-              const SizedBox(height: 8),
-            ],
+            ),
           ),
-        ),
-      ),
     );
 
     if (result == null || !mounted) return;
@@ -261,40 +333,64 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
     setState(() => _saving = true);
 
     try {
-      final boundary = _repaintKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      final boundary =
+          _repaintKey.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
       if (boundary == null) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('生成图片失败')));
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('生成图片失败')));
+        }
         return;
       }
 
       final image = await boundary.toImage(pixelRatio: 3.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('生成图片失败')));
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('生成图片失败')));
+        }
         return;
       }
 
       final tempDir = await getTemporaryDirectory();
-      final fileName = 'FitFlow_$_year${_month.toString().padLeft(2, '0')}_report.png';
+      final fileName =
+          'FitFlow_$_year${_month.toString().padLeft(2, '0')}_report.png';
       final file = File('${tempDir.path}/$fileName');
       await file.writeAsBytes(byteData.buffer.asUint8List());
 
       if (!mounted) return;
 
       if (result == 'save') {
-        final saveResult = await ImageGallerySaverPlus.saveFile(file.path, name: fileName);
+        final saveResult = await ImageGallerySaverPlus.saveFile(
+          file.path,
+          name: fileName,
+        );
         if (mounted) {
           if (saveResult['isSuccess'] == true) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已保存到相册')));
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('已保存到相册')));
           } else {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('保存失败，请检查相册权限')));
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('保存失败，请检查相册权限')));
           }
         }
       } else {
-        await Share.shareXFiles([XFile(file.path)], text: 'FitFlow $_year年$_month月游泳报告 🏊');
+        await Share.shareXFiles([
+          XFile(file.path),
+        ], text: 'FitFlow $_year年$_month月游泳报告 🏊');
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('操作失败: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('操作失败: $e')));
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -313,42 +409,75 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
           icon: const Icon(Icons.arrow_back, color: Color(0xFF3D3D3D)),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text('$monthName 游泳报告', style: const TextStyle(
-          fontWeight: FontWeight.bold,
-          color: Color(0xFF3D3D3D),
-          fontSize: 17,
-        )),
-        centerTitle: true,
-        actions: [
-          _saving
-              ? const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-                )
-              : IconButton(
-                  icon: const Icon(Icons.share, color: Color(0xFF3D3D3D)),
-                  onPressed: _swimSessions.isEmpty ? null : _shareCard,
-                ),
-        ],
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _swimSessions.isEmpty
-              ? _EmptyState(monthName: monthName)
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: RepaintBoundary(
-                    key: _repaintKey,
-                    child: _SwimReportContent(
-                      sessions: _swimSessions,
-                      prevSessions: _prevSwimSessions,
-                      year: _year,
-                      month: _month,
-                      milestones: _milestones,
-                      onTapMonth: _showMonthPicker,
-                    ),
+        title: GestureDetector(
+          onTap: _showMonthPicker,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  '$monthName 游泳报告',
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF3D3D3D),
+                    fontSize: 17,
                   ),
                 ),
+              ),
+              const SizedBox(width: 2),
+              const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: Color(0xFF3D3D3D),
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(
+              Icons.calendar_month_outlined,
+              color: Color(0xFF3D3D3D),
+            ),
+            onPressed: _showMonthPicker,
+            tooltip: '切换月份',
+          ),
+          _saving
+              ? const Padding(
+                padding: EdgeInsets.all(16),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+              : IconButton(
+                icon: const Icon(Icons.share, color: Color(0xFF3D3D3D)),
+                onPressed: _swimSessions.isEmpty ? null : _shareCard,
+              ),
+        ],
+      ),
+      body:
+          _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _swimSessions.isEmpty
+              ? _EmptyState(monthName: monthName, onTapMonth: _showMonthPicker)
+              : SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: RepaintBoundary(
+                  key: _repaintKey,
+                  child: _SwimReportContent(
+                    sessions: _swimSessions,
+                    prevSessions: _prevSwimSessions,
+                    year: _year,
+                    month: _month,
+                    milestones: _milestones,
+                    onTapMonth: _showMonthPicker,
+                  ),
+                ),
+              ),
     );
   }
 }
@@ -357,7 +486,10 @@ class _MonthPickerDialog extends StatefulWidget {
   final int initialYear;
   final int initialMonth;
 
-  const _MonthPickerDialog({required this.initialYear, required this.initialMonth});
+  const _MonthPickerDialog({
+    required this.initialYear,
+    required this.initialMonth,
+  });
 
   @override
   State<_MonthPickerDialog> createState() => _MonthPickerDialogState();
@@ -419,9 +551,12 @@ class _MonthPickerDialogState extends State<_MonthPickerDialog> {
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         decoration: BoxDecoration(
-                          color: isSelected
-                              ? const Color(0xFF00D4FF).withValues(alpha: 0.15)
-                              : Colors.transparent,
+                          color:
+                              isSelected
+                                  ? const Color(
+                                    0xFF00D4FF,
+                                  ).withValues(alpha: 0.15)
+                                  : Colors.transparent,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -429,10 +564,14 @@ class _MonthPickerDialogState extends State<_MonthPickerDialog> {
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 16,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                            color: isSelected
-                                ? const Color(0xFF00D4FF)
-                                : (isDark ? Colors.white : Colors.black87),
+                            fontWeight:
+                                isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                            color:
+                                isSelected
+                                    ? const Color(0xFF00D4FF)
+                                    : (isDark ? Colors.white : Colors.black87),
                           ),
                         ),
                       ),
@@ -457,15 +596,19 @@ class _MonthPickerDialogState extends State<_MonthPickerDialog> {
                   builder: (context, index) {
                     final month = index + 1;
                     final isSelected = month == _selectedMonth;
-                    final isFuture = _selectedYear == now.year && month > now.month;
+                    final isFuture =
+                        _selectedYear == now.year && month > now.month;
                     return Center(
                       child: Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         decoration: BoxDecoration(
-                          color: isSelected
-                              ? const Color(0xFF00D4FF).withValues(alpha: 0.15)
-                              : Colors.transparent,
+                          color:
+                              isSelected
+                                  ? const Color(
+                                    0xFF00D4FF,
+                                  ).withValues(alpha: 0.15)
+                                  : Colors.transparent,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -473,12 +616,18 @@ class _MonthPickerDialogState extends State<_MonthPickerDialog> {
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 16,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                            color: isSelected
-                                ? const Color(0xFF00D4FF)
-                                : (isFuture
-                                    ? Colors.grey
-                                    : (isDark ? Colors.white : Colors.black87)),
+                            fontWeight:
+                                isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                            color:
+                                isSelected
+                                    ? const Color(0xFF00D4FF)
+                                    : (isFuture
+                                        ? Colors.grey
+                                        : (isDark
+                                            ? Colors.white
+                                            : Colors.black87)),
                           ),
                         ),
                       ),
@@ -497,7 +646,11 @@ class _MonthPickerDialogState extends State<_MonthPickerDialog> {
           child: const Text('取消'),
         ),
         TextButton(
-          onPressed: () => Navigator.pop(context, DateTime(_selectedYear, _selectedMonth)),
+          onPressed:
+              () => Navigator.pop(
+                context,
+                DateTime(_selectedYear, _selectedMonth),
+              ),
           child: const Text('确定'),
         ),
       ],
@@ -507,7 +660,8 @@ class _MonthPickerDialogState extends State<_MonthPickerDialog> {
 
 class _EmptyState extends StatelessWidget {
   final String monthName;
-  const _EmptyState({required this.monthName});
+  final VoidCallback onTapMonth;
+  const _EmptyState({required this.monthName, required this.onTapMonth});
 
   @override
   Widget build(BuildContext context) {
@@ -517,10 +671,24 @@ class _EmptyState extends StatelessWidget {
         children: [
           const Text('🏊', style: TextStyle(fontSize: 64)),
           const SizedBox(height: 16),
-          Text('$monthName暂无游泳记录', style: const TextStyle(
-            color: Color(0xFF888888),
-            fontSize: 16,
-          )),
+          Text(
+            '$monthName暂无游泳记录',
+            style: const TextStyle(color: Color(0xFF888888), fontSize: 16),
+          ),
+          const SizedBox(height: 18),
+          OutlinedButton.icon(
+            onPressed: onTapMonth,
+            icon: const Icon(Icons.calendar_month_outlined, size: 18),
+            label: const Text('切换月份'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _swimPrimary,
+              side: BorderSide(color: _swimPrimary.withValues(alpha: 0.45)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            ),
+          ),
         ],
       ),
     );
@@ -546,26 +714,42 @@ class _SwimReportContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalDistance = sessions.fold<int>(0, (sum, s) => sum + (s.totalDistanceMeters ?? 0));
-    final totalMinutes = sessions.fold<int>(0, (sum, s) => sum + s.durationInMinutes);
-    final avgDistance = sessions.isEmpty ? '0' : (totalDistance / sessions.length / 1000).toStringAsFixed(1);
+    final totalDistance = sessions.fold<int>(
+      0,
+      (sum, s) => sum + (s.totalDistanceMeters ?? 0),
+    );
+    final totalMinutes = sessions.fold<int>(
+      0,
+      (sum, s) => sum + s.durationInMinutes,
+    );
+    final avgDistance =
+        sessions.isEmpty
+            ? '0'
+            : (totalDistance / sessions.length / 1000).toStringAsFixed(1);
     final avgPace = _calcAvgPace(sessions);
 
     // Previous month stats for comparison
-    final prevTotalDist = prevSessions.fold<int>(0, (sum, s) => sum + (s.totalDistanceMeters ?? 0));
+    final prevTotalDist = prevSessions.fold<int>(
+      0,
+      (sum, s) => sum + (s.totalDistanceMeters ?? 0),
+    );
     final prevCount = prevSessions.length;
     final prevAvgPace = _calcPaceValue(prevSessions);
 
     // Compute month-over-month deltas
-    final distDelta = prevTotalDist > 0
-        ? ((totalDistance - prevTotalDist) / prevTotalDist * 100).round()
-        : (totalDistance > 0 ? 100 : 0);
-    final countDelta = prevCount > 0
-        ? ((sessions.length - prevCount) / prevCount * 100).round()
-        : (sessions.isNotEmpty ? 100 : 0);
-    final paceDelta = prevAvgPace != null && prevAvgPace > 0
-        ? ((_calcPaceValue(sessions)! - prevAvgPace) / prevAvgPace * 100).round()
-        : 0;
+    final distDelta =
+        prevTotalDist > 0
+            ? ((totalDistance - prevTotalDist) / prevTotalDist * 100).round()
+            : (totalDistance > 0 ? 100 : 0);
+    final countDelta =
+        prevCount > 0
+            ? ((sessions.length - prevCount) / prevCount * 100).round()
+            : (sessions.isNotEmpty ? 100 : 0);
+    final paceDelta =
+        prevAvgPace != null && prevAvgPace > 0
+            ? ((_calcPaceValue(sessions)! - prevAvgPace) / prevAvgPace * 100)
+                .round()
+            : 0;
     // Pace: lower is better, so negative delta is good
     final paceBetter = paceDelta < 0;
 
@@ -574,13 +758,13 @@ class _SwimReportContent extends StatelessWidget {
     for (final s in sessions) {
       if (s.swimSets != null) {
         for (final set in s.swimSets!) {
-          styleCount[set.style] = (styleCount[set.style] ?? 0) + set.distanceMeters;
+          styleCount[set.style] =
+              (styleCount[set.style] ?? 0) + set.distanceMeters;
         }
       }
     }
-    final sortedStyles = styleCount.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-
+    final sortedStyles =
+        styleCount.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -597,41 +781,49 @@ class _SwimReportContent extends StatelessWidget {
         // ── Summary Stats Row ────────────────────────────
         Row(
           children: [
-            Expanded(child: _SwimStatCard(
-              icon: '📏',
-              label: '总距离',
-              value: (totalDistance / 1000).toStringAsFixed(1),
-              unit: '公里',
-              color: _swimPrimary,
-            )),
+            Expanded(
+              child: _SwimStatCard(
+                icon: '📏',
+                label: '总距离',
+                value: (totalDistance / 1000).toStringAsFixed(1),
+                unit: '公里',
+                color: _swimPrimary,
+              ),
+            ),
             const SizedBox(width: 12),
-            Expanded(child: _SwimStatCard(
-              icon: '⏱️',
-              label: '总时长',
-              value: '$totalMinutes',
-              unit: '分钟',
-              color: const Color(0xFF52C9A4),
-            )),
+            Expanded(
+              child: _SwimStatCard(
+                icon: '⏱️',
+                label: '总时长',
+                value: '$totalMinutes',
+                unit: '分钟',
+                color: const Color(0xFF52C9A4),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: _SwimStatCard(
-              icon: '🏊',
-              label: '训练次数',
-              value: '${sessions.length}',
-              unit: '次',
-              color: const Color(0xFFFF8FA3),
-            )),
+            Expanded(
+              child: _SwimStatCard(
+                icon: '🏊',
+                label: '训练次数',
+                value: '${sessions.length}',
+                unit: '次',
+                color: const Color(0xFFFF8FA3),
+              ),
+            ),
             const SizedBox(width: 12),
-            Expanded(child: _SwimStatCard(
-              icon: '⚡',
-              label: '平均配速',
-              value: avgPace,
-              unit: '',
-              color: const Color(0xFFFFB347),
-            )),
+            Expanded(
+              child: _SwimStatCard(
+                icon: '⚡',
+                label: '平均配速',
+                value: avgPace,
+                unit: '',
+                color: const Color(0xFFFFB347),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 16),
@@ -656,7 +848,10 @@ class _SwimReportContent extends StatelessWidget {
 
         // ── Style Breakdown ───────────────────────────────
         if (sortedStyles.isNotEmpty) ...[
-          _StyleBreakdownCard(sortedStyles: sortedStyles, totalDistance: totalDistance),
+          _StyleBreakdownCard(
+            sortedStyles: sortedStyles,
+            totalDistance: totalDistance,
+          ),
           const SizedBox(height: 20),
         ],
 
@@ -735,39 +930,48 @@ class _MonthComparisonCard extends StatelessWidget {
             children: [
               Text('📊', style: TextStyle(fontSize: 16)),
               SizedBox(width: 6),
-              Text('上月对比', style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF3D3D3D),
-              )),
+              Text(
+                '上月对比',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF3D3D3D),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 14),
           Row(
             children: [
-              Expanded(child: _DeltaTile(
-                label: '总距离',
-                delta: distDelta,
-                positiveGood: true,
-                icon: '📏',
-                color: _swimPrimary,
-              )),
+              Expanded(
+                child: _DeltaTile(
+                  label: '总距离',
+                  delta: distDelta,
+                  positiveGood: true,
+                  icon: '📏',
+                  color: _swimPrimary,
+                ),
+              ),
               const SizedBox(width: 10),
-              Expanded(child: _DeltaTile(
-                label: '训练次数',
-                delta: countDelta,
-                positiveGood: true,
-                icon: '🏊',
-                color: const Color(0xFFFF8FA3),
-              )),
+              Expanded(
+                child: _DeltaTile(
+                  label: '训练次数',
+                  delta: countDelta,
+                  positiveGood: true,
+                  icon: '🏊',
+                  color: const Color(0xFFFF8FA3),
+                ),
+              ),
               const SizedBox(width: 10),
-              Expanded(child: _DeltaTile(
-                label: '配速',
-                delta: paceDelta,
-                positiveGood: !paceBetter,
-                icon: '⚡',
-                color: const Color(0xFFFFB347),
-              )),
+              Expanded(
+                child: _DeltaTile(
+                  label: '配速',
+                  delta: paceDelta,
+                  positiveGood: !paceBetter,
+                  icon: '⚡',
+                  color: const Color(0xFFFFB347),
+                ),
+              ),
             ],
           ),
         ],
@@ -799,12 +1003,14 @@ class _DeltaTile extends StatelessWidget {
     // 箭头跟着"是否变好"走：变好↑，变差↓
     final arrow = isGood ? '↑' : '↓';
     // 颜色反过来：变好红色，变差绿色
-    final deltaColor = isGood ? const Color(0xFFFF3B30) : const Color(0xFF34C759);
+    final deltaColor =
+        isGood ? const Color(0xFFFF3B30) : const Color(0xFF34C759);
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
-        color: (isGood ? const Color(0xFFFF3B30) : const Color(0xFF34C759)).withValues(alpha: 0.08),
+        color: (isGood ? const Color(0xFFFF3B30) : const Color(0xFF34C759))
+            .withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
@@ -822,10 +1028,7 @@ class _DeltaTile extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             label,
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 10,
-            ),
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 10),
           ),
         ],
       ),
@@ -846,11 +1049,16 @@ class _MonthHeatmapCard extends StatelessWidget {
 
   String _styleEmoji(SwimStyle style) {
     switch (style) {
-      case SwimStyle.freestyle: return '🏊';
-      case SwimStyle.breaststroke: return '🐸';
-      case SwimStyle.backstroke: return '🔄';
-      case SwimStyle.butterfly: return '🦋';
-      case SwimStyle.medley: return '🌊';
+      case SwimStyle.freestyle:
+        return '🏊';
+      case SwimStyle.breaststroke:
+        return '🐸';
+      case SwimStyle.backstroke:
+        return '🔄';
+      case SwimStyle.butterfly:
+        return '🦋';
+      case SwimStyle.medley:
+        return '🌊';
     }
   }
 
@@ -862,19 +1070,25 @@ class _MonthHeatmapCard extends StatelessWidget {
     final dailyCalories = <int, int>{};
     final dailyStyle = <int, SwimStyle>{};
     for (final s in sessions) {
-      dailyCalories[s.date.day] = (dailyCalories[s.date.day] ?? 0) + (s.calories ?? 0);
+      dailyCalories[s.date.day] =
+          (dailyCalories[s.date.day] ?? 0) + (s.calories ?? 0);
       if (s.swimSets != null && s.swimSets!.isNotEmpty) {
         // Use the most logged style for the day
         final styleCount = <SwimStyle, int>{};
         for (final set in s.swimSets!) {
-          styleCount[set.style] = (styleCount[set.style] ?? 0) + set.distanceMeters;
+          styleCount[set.style] =
+              (styleCount[set.style] ?? 0) + set.distanceMeters;
         }
-        final topStyle = styleCount.entries.reduce((a, b) => a.value > b.value ? a : b).key;
+        final topStyle =
+            styleCount.entries.reduce((a, b) => a.value > b.value ? a : b).key;
         dailyStyle[s.date.day] = topStyle;
       }
     }
 
-    final maxCal = dailyCalories.values.isEmpty ? 1 : dailyCalories.values.reduce((a, b) => a > b ? a : b);
+    final maxCal =
+        dailyCalories.values.isEmpty
+            ? 1
+            : dailyCalories.values.reduce((a, b) => a > b ? a : b);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -896,25 +1110,37 @@ class _MonthHeatmapCard extends StatelessWidget {
             children: [
               Text('🔥', style: TextStyle(fontSize: 16)),
               SizedBox(width: 6),
-              Text('训练热度', style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF3D3D3D),
-              )),
+              Text(
+                '训练热度',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF3D3D3D),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
           // Weekday labels
           Row(
             mainAxisAlignment: MainAxisAlignment.start,
-            children: ['日', '一', '二', '三', '四', '五', '六'].map((d) => SizedBox(
-              width: 36,
-              child: Text(d, textAlign: TextAlign.center, style: TextStyle(
-                fontSize: 10,
-                color: Colors.grey.shade500,
-                fontWeight: FontWeight.w500,
-              )),
-            )).toList(),
+            children:
+                ['日', '一', '二', '三', '四', '五', '六']
+                    .map(
+                      (d) => SizedBox(
+                        width: 36,
+                        child: Text(
+                          d,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey.shade500,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
           ),
           const SizedBox(height: 4),
           // Calendar grid
@@ -952,34 +1178,41 @@ class _MonthHeatmapCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Center(
-                    child: dailyStyle[day] != null
-                        ? Row(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                _styleEmoji(dailyStyle[day]!),
-                                style: const TextStyle(fontSize: 8),
-                              ),
-                              const SizedBox(width: 1),
-                              Text(
-                                '$day',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w500,
-                                  color: intensity > 0.5 ? Colors.white : Colors.grey.shade700,
+                    child:
+                        dailyStyle[day] != null
+                            ? Row(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  _styleEmoji(dailyStyle[day]!),
+                                  style: const TextStyle(fontSize: 8),
                                 ),
+                                const SizedBox(width: 1),
+                                Text(
+                                  '$day',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w500,
+                                    color:
+                                        intensity > 0.5
+                                            ? Colors.white
+                                            : Colors.grey.shade700,
+                                  ),
+                                ),
+                              ],
+                            )
+                            : Text(
+                              '$day',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color:
+                                    intensity > 0.5
+                                        ? Colors.white
+                                        : Colors.grey.shade700,
                               ),
-                            ],
-                          )
-                        : Text(
-                            '$day',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                              color: intensity > 0.5 ? Colors.white : Colors.grey.shade700,
                             ),
-                          ),
                   ),
                 ),
               );
@@ -990,19 +1223,27 @@ class _MonthHeatmapCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text('低', style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
+              Text(
+                '低',
+                style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+              ),
               const SizedBox(width: 4),
-              ...[0.15, 0.35, 0.6, 0.85].map((opacity) => Container(
-                width: 16,
-                height: 16,
-                margin: const EdgeInsets.symmetric(horizontal: 2),
-                decoration: BoxDecoration(
-                  color: _swimPrimary.withValues(alpha: opacity),
-                  borderRadius: BorderRadius.circular(3),
+              ...[0.15, 0.35, 0.6, 0.85].map(
+                (opacity) => Container(
+                  width: 16,
+                  height: 16,
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  decoration: BoxDecoration(
+                    color: _swimPrimary.withValues(alpha: opacity),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
                 ),
-              )),
+              ),
               const SizedBox(width: 4),
-              Text('高', style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
+              Text(
+                '高',
+                style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+              ),
             ],
           ),
         ],
@@ -1052,7 +1293,11 @@ class _SwimHeaderCard extends StatelessWidget {
             bottom: -10,
             child: Opacity(
               opacity: 0.15,
-              child: Icon(Icons.pool, size: 140, color: Colors.white.withValues(alpha: 0.5)),
+              child: Icon(
+                Icons.pool,
+                size: 140,
+                color: Colors.white.withValues(alpha: 0.5),
+              ),
             ),
           ),
           Padding(
@@ -1063,7 +1308,10 @@ class _SwimHeaderCard extends StatelessWidget {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.25),
                         borderRadius: BorderRadius.circular(20),
@@ -1073,7 +1321,14 @@ class _SwimHeaderCard extends StatelessWidget {
                         children: [
                           Text('🏊', style: TextStyle(fontSize: 12)),
                           SizedBox(width: 4),
-                          Text('游泳进步', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
+                          Text(
+                            '游泳进步',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -1196,7 +1451,9 @@ class _SwimStatCard extends StatelessWidget {
               color: color.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Center(child: Text(icon, style: const TextStyle(fontSize: 20))),
+            child: Center(
+              child: Text(icon, style: const TextStyle(fontSize: 20)),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1205,10 +1462,7 @@ class _SwimStatCard extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                 ),
                 const SizedBox(height: 4),
                 Row(
@@ -1244,12 +1498,1333 @@ class _SwimStatCard extends StatelessWidget {
   }
 }
 
+enum _ComparisonMetric { pace, distance, swolf, heartRate }
+
+const int _comparisonLaneMeters = 25;
+const int _comparisonReplayDurationMaxMeters = 500;
+const int _comparisonReplayMinSeconds = 40;
+const int _comparisonReplayMaxSeconds = 80;
+
+int _swimDurationSeconds(WorkoutSession session) {
+  if (session.durationSeconds > 0) return session.durationSeconds;
+  final minutes = session.durationMinutes;
+  if (minutes != null && minutes > 0) return minutes * 60;
+  return 0;
+}
+
+int _swimDistanceMeters(WorkoutSession session) =>
+    math.max(0, session.totalDistanceMeters ?? 0);
+
+int? _paceSecondsForSession(WorkoutSession session) {
+  final parsed = _parsePaceToSeconds(session.avgPace);
+  if (parsed != null) return parsed;
+
+  final distance = _swimDistanceMeters(session);
+  final seconds = _swimDurationSeconds(session);
+  if (distance <= 0 || seconds <= 0) return null;
+  return (seconds / (distance / 100)).round();
+}
+
+String _formatCompactDate(DateTime date) =>
+    '${date.year}.${date.month}.${date.day}';
+
+String _formatDurationCompact(int seconds) {
+  if (seconds <= 0) return '--';
+  final hours = seconds ~/ 3600;
+  final minutes = (seconds % 3600) ~/ 60;
+  final secs = seconds % 60;
+  if (hours > 0) {
+    return '$hours:${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+  }
+  return "$minutes'${secs.toString().padLeft(2, '0')}\"";
+}
+
+String _formatMetricPace(int? seconds) {
+  if (seconds == null || seconds <= 0) return '--';
+  final minutes = seconds ~/ 60;
+  final secs = seconds % 60;
+  return "$minutes'${secs.toString().padLeft(2, '0')}\"";
+}
+
+String _swimStyleName(WorkoutSession session) {
+  final sets = session.swimSets;
+  if (sets == null || sets.isEmpty) return '游泳';
+
+  final distanceByStyle = <SwimStyle, int>{};
+  for (final set in sets) {
+    distanceByStyle[set.style] =
+        (distanceByStyle[set.style] ?? 0) + set.distanceMeters;
+  }
+  final topStyle =
+      distanceByStyle.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
+
+  switch (topStyle) {
+    case SwimStyle.freestyle:
+      return '自由泳';
+    case SwimStyle.breaststroke:
+      return '蛙泳';
+    case SwimStyle.backstroke:
+      return '仰泳';
+    case SwimStyle.butterfly:
+      return '蝶泳';
+    case SwimStyle.medley:
+      return '混合泳';
+  }
+}
+
+bool _isValidComparisonSession(WorkoutSession session) =>
+    session.type == WorkoutType.swim &&
+    session.countsAsWorkout &&
+    _swimDistanceMeters(session) > 0 &&
+    _swimDurationSeconds(session) > 0;
+
+List<WorkoutSession> _priorComparisonSessions(
+  WorkoutSession current,
+  List<WorkoutSession> allSessions,
+) {
+  return allSessions
+      .where(
+        (session) =>
+            session.id != current.id &&
+            _isValidComparisonSession(session) &&
+            session.date.isBefore(current.date),
+      )
+      .toList()
+    ..sort((a, b) => b.date.compareTo(a.date));
+}
+
+class SwimSessionComparisonCard extends StatefulWidget {
+  final WorkoutSession currentSession;
+  final List<WorkoutSession> allSessions;
+
+  const SwimSessionComparisonCard({
+    super.key,
+    required this.currentSession,
+    required this.allSessions,
+  });
+
+  @override
+  State<SwimSessionComparisonCard> createState() =>
+      _SwimSessionComparisonCardState();
+}
+
+class _SwimSessionComparisonCardState extends State<SwimSessionComparisonCard> {
+  String? _selectedBenchmarkId;
+
+  @override
+  void didUpdateWidget(covariant SwimSessionComparisonCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentSession.id != widget.currentSession.id) {
+      _selectedBenchmarkId = null;
+    }
+  }
+
+  WorkoutSession? _selectedBenchmark(List<WorkoutSession> candidates) {
+    final selectedId = _selectedBenchmarkId;
+    if (selectedId != null) {
+      for (final session in candidates) {
+        if (session.id == selectedId) return session;
+      }
+    }
+    return candidates.isEmpty ? null : candidates.first;
+  }
+
+  Future<void> _showBenchmarkPicker(
+    List<WorkoutSession> candidates,
+    WorkoutSession selected,
+  ) async {
+    final result = await showModalBottomSheet<WorkoutSession>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        return FractionallySizedBox(
+          heightFactor: 0.72,
+          child: SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
+                  child: Text('选择对照组', style: theme.textTheme.titleLarge),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: ListView.separated(
+                    itemCount: candidates.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final session = candidates[index];
+                      final isSelected = session.id == selected.id;
+                      final pace =
+                          session.avgPace == null || session.avgPace!.isEmpty
+                              ? ''
+                              : ' · ${session.avgPace}/100m';
+                      return ListTile(
+                        selected: isSelected,
+                        leading: const Icon(
+                          Icons.pool_outlined,
+                          color: _swimPrimary,
+                        ),
+                        title: Text(
+                          '${_formatCompactDate(session.date)} · ${_swimStyleName(session)}',
+                        ),
+                        subtitle: Text(
+                          '${_swimDistanceMeters(session)}m · ${_formatDurationCompact(_swimDurationSeconds(session))}$pace',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing:
+                            isSelected
+                                ? const Icon(
+                                  Icons.check_circle_rounded,
+                                  color: _swimPrimary,
+                                )
+                                : null,
+                        onTap: () => Navigator.pop(sheetContext, session),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (result == null || !mounted) return;
+    setState(() => _selectedBenchmarkId = result.id);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_isValidComparisonSession(widget.currentSession)) {
+      return const SizedBox.shrink();
+    }
+
+    final candidates = _priorComparisonSessions(
+      widget.currentSession,
+      widget.allSessions,
+    );
+    final benchmark = _selectedBenchmark(candidates);
+    if (benchmark == null) return const SizedBox.shrink();
+
+    return _DynamicSwimComparisonCard(
+      data: _SwimComparisonData(
+        current: widget.currentSession,
+        benchmark: benchmark,
+      ),
+      onTapBenchmark: () => _showBenchmarkPicker(candidates, benchmark),
+    );
+  }
+}
+
+class _SwimComparisonData {
+  final WorkoutSession current;
+  final WorkoutSession benchmark;
+
+  const _SwimComparisonData({required this.current, required this.benchmark});
+
+  int get currentDistance => _swimDistanceMeters(current);
+  int get benchmarkDistance => _swimDistanceMeters(benchmark);
+  int get currentSeconds => _swimDurationSeconds(current);
+  int get benchmarkSeconds => _swimDurationSeconds(benchmark);
+  int get maxSeconds => math.max(currentSeconds, benchmarkSeconds);
+  int? get currentPaceSeconds => _paceSecondsForSession(current);
+  int? get benchmarkPaceSeconds => _paceSecondsForSession(benchmark);
+  int get replayDistance {
+    final maxDistance = math.max(currentDistance, benchmarkDistance);
+    if (maxDistance <= 0) return _comparisonLaneMeters;
+    return maxDistance;
+  }
+
+  int get replaySeconds {
+    final currentSpeed =
+        currentSeconds <= 0 ? 0.0 : currentDistance / currentSeconds;
+    final benchmarkSpeed =
+        benchmarkSeconds <= 0 ? 0.0 : benchmarkDistance / benchmarkSeconds;
+    final speeds = [currentSpeed, benchmarkSpeed].where((v) => v > 0).toList();
+    if (speeds.isEmpty) return maxSeconds;
+    final slowestSpeed = speeds.reduce(math.min);
+    return math.min(
+      maxSeconds,
+      math.max(1, (replayDistance / slowestSpeed).round()),
+    );
+  }
+
+  Duration get replayDuration {
+    final durationDistance = math.min(
+      replayDistance,
+      _comparisonReplayDurationMaxMeters,
+    );
+    final distanceRange =
+        _comparisonReplayDurationMaxMeters - _comparisonLaneMeters;
+    final distanceRatio =
+        distanceRange <= 0
+            ? 1.0
+            : ((durationDistance - _comparisonLaneMeters) / distanceRange)
+                .clamp(0.0, 1.0);
+    final seconds =
+        _comparisonReplayMinSeconds +
+        ((_comparisonReplayMaxSeconds - _comparisonReplayMinSeconds) *
+                distanceRatio)
+            .round();
+    return Duration(seconds: seconds);
+  }
+
+  _SwimPlaybackFrame frameAt(double progress) {
+    final elapsed = (replaySeconds * progress).round();
+    final currentMeters = _distanceAtElapsed(
+      totalMeters: currentDistance,
+      totalSeconds: currentSeconds,
+      elapsedSeconds: elapsed,
+    );
+    final benchmarkMeters = _distanceAtElapsed(
+      totalMeters: benchmarkDistance,
+      totalSeconds: benchmarkSeconds,
+      elapsedSeconds: elapsed,
+    );
+
+    return _SwimPlaybackFrame(
+      elapsedSeconds: elapsed,
+      currentMeters: currentMeters,
+      benchmarkMeters: benchmarkMeters,
+      leadMeters: currentMeters - benchmarkMeters,
+    );
+  }
+
+  double _distanceAtElapsed({
+    required int totalMeters,
+    required int totalSeconds,
+    required int elapsedSeconds,
+  }) {
+    if (totalMeters <= 0 || totalSeconds <= 0) return 0;
+    final ratio = (elapsedSeconds / totalSeconds).clamp(0.0, 1.0);
+    return totalMeters * ratio;
+  }
+}
+
+class _SwimPlaybackFrame {
+  final int elapsedSeconds;
+  final double currentMeters;
+  final double benchmarkMeters;
+  final double leadMeters;
+
+  const _SwimPlaybackFrame({
+    required this.elapsedSeconds,
+    required this.currentMeters,
+    required this.benchmarkMeters,
+    required this.leadMeters,
+  });
+}
+
+class _LanePosition {
+  final double ratio;
+  final int direction;
+
+  const _LanePosition({required this.ratio, required this.direction});
+}
+
+_LanePosition _lanePositionForMeters(double meters) {
+  if (meters <= 0) {
+    return const _LanePosition(ratio: 0, direction: 1);
+  }
+
+  const cycleMeters = _comparisonLaneMeters * 2;
+  final distanceInCycle = meters % cycleMeters;
+  if (distanceInCycle <= _comparisonLaneMeters) {
+    return _LanePosition(
+      ratio: distanceInCycle / _comparisonLaneMeters,
+      direction: 1,
+    );
+  }
+
+  return _LanePosition(
+    ratio: (cycleMeters - distanceInCycle) / _comparisonLaneMeters,
+    direction: -1,
+  );
+}
+
+class _DynamicSwimComparisonCard extends StatefulWidget {
+  final _SwimComparisonData data;
+  final VoidCallback onTapBenchmark;
+
+  const _DynamicSwimComparisonCard({
+    required this.data,
+    required this.onTapBenchmark,
+  });
+
+  @override
+  State<_DynamicSwimComparisonCard> createState() =>
+      _DynamicSwimComparisonCardState();
+}
+
+class _DynamicSwimComparisonCardState extends State<_DynamicSwimComparisonCard>
+    with TickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final AnimationController _strokeController;
+  _ComparisonMetric _metric = _ComparisonMetric.pace;
+  bool _playing = true;
+  ui.Image? _currentSwimmerSprite;
+  ui.Image? _benchmarkSwimmerSprite;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this)
+      ..repeat(period: widget.data.replayDuration);
+    _strokeController = AnimationController(vsync: this)..repeat(
+      period: const Duration(milliseconds: _swimmerStrokeCycleMilliseconds),
+    );
+    _loadSwimmerSprites();
+  }
+
+  Future<void> _loadSwimmerSprites() async {
+    ui.Image? current;
+    ui.Image? benchmark;
+    try {
+      current = await _loadUiImageAsset(_breaststrokeOrangeSpriteAsset);
+      benchmark = await _loadUiImageAsset(_breaststrokeBlueSpriteAsset);
+      if (!mounted) {
+        current.dispose();
+        benchmark.dispose();
+        return;
+      }
+      setState(() {
+        _currentSwimmerSprite = current;
+        _benchmarkSwimmerSprite = benchmark;
+      });
+    } catch (_) {
+      current?.dispose();
+      benchmark?.dispose();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _DynamicSwimComparisonCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.data.current.id != widget.data.current.id ||
+        oldWidget.data.benchmark.id != widget.data.benchmark.id) {
+      _controller
+        ..reset()
+        ..repeat(period: widget.data.replayDuration);
+      _strokeController
+        ..reset()
+        ..repeat(
+          period: const Duration(milliseconds: _swimmerStrokeCycleMilliseconds),
+        );
+      _playing = true;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _strokeController.dispose();
+    _currentSwimmerSprite?.dispose();
+    _benchmarkSwimmerSprite?.dispose();
+    super.dispose();
+  }
+
+  void _togglePlayback() {
+    setState(() {
+      _playing = !_playing;
+      if (_playing) {
+        _controller.repeat(period: widget.data.replayDuration);
+        _strokeController.repeat(
+          period: const Duration(milliseconds: _swimmerStrokeCycleMilliseconds),
+        );
+      } else {
+        _controller.stop();
+        _strokeController.stop();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final data = widget.data;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                '当前记录与对照组',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF3D3D3D),
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 28,
+              height: 28,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                onPressed: _togglePlayback,
+                iconSize: 20,
+                icon: Icon(
+                  _playing
+                      ? Icons.pause_circle_filled_rounded
+                      : Icons.play_circle_fill_rounded,
+                  color: const Color(0xFF3D3D3D),
+                ),
+                tooltip: _playing ? '暂停' : '播放',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _ComparisonSessionPill(
+                label: '当前组',
+                session: data.current,
+                color: const Color(0xFFFF8A2A),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _ComparisonSessionPill(
+                label: '对照组',
+                session: data.benchmark,
+                color: _swimPrimary,
+                onTap: widget.onTapBenchmark,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            final frame = data.frameAt(_controller.value);
+            return Column(
+              children: [
+                Container(
+                  height: 112,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEAF8FF),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFFCFEAF7)),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: CustomPaint(
+                      painter: _SwimComparisonPainter(
+                        data: data,
+                        frame: frame,
+                        phase: _controller.value,
+                        strokeProgress: _strokeController.value,
+                        currentSwimmerSprite: _currentSwimmerSprite,
+                        benchmarkSwimmerSprite: _benchmarkSwimmerSprite,
+                      ),
+                      child: const SizedBox.expand(),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                _PlaybackStatusRow(data: data, frame: frame),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            _ComparisonMetricChip(
+              label: '配速',
+              selected: _metric == _ComparisonMetric.pace,
+              onTap: () => setState(() => _metric = _ComparisonMetric.pace),
+            ),
+            _ComparisonMetricChip(
+              label: '距离',
+              selected: _metric == _ComparisonMetric.distance,
+              onTap: () => setState(() => _metric = _ComparisonMetric.distance),
+            ),
+            _ComparisonMetricChip(
+              label: 'SWOLF',
+              selected: _metric == _ComparisonMetric.swolf,
+              onTap: () => setState(() => _metric = _ComparisonMetric.swolf),
+            ),
+            _ComparisonMetricChip(
+              label: '心率',
+              selected: _metric == _ComparisonMetric.heartRate,
+              onTap:
+                  () => setState(() => _metric = _ComparisonMetric.heartRate),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        _ComparisonMetricSummary(data: data, metric: _metric),
+      ],
+    );
+  }
+}
+
+class _ComparisonSessionPill extends StatelessWidget {
+  final String label;
+  final WorkoutSession session;
+  final Color color;
+  final VoidCallback? onTap;
+
+  const _ComparisonSessionPill({
+    required this.label,
+    required this.session,
+    required this.color,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final distance = _swimDistanceMeters(session);
+    final duration = _swimDurationSeconds(session);
+
+    return Semantics(
+      button: onTap != null,
+      label: onTap == null ? null : '选择对照组',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.11),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: color.withValues(alpha: 0.28)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _formatDurationCompact(duration),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF243142),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '${_formatCompactDate(session.date)} · ${_swimStyleName(session)} · ${distance}m',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF7A8495),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlaybackStatusRow extends StatelessWidget {
+  final _SwimComparisonData data;
+  final _SwimPlaybackFrame frame;
+
+  const _PlaybackStatusRow({required this.data, required this.frame});
+
+  @override
+  Widget build(BuildContext context) {
+    final leading = frame.leadMeters;
+    final label =
+        leading.abs() < 1
+            ? '几乎并排'
+            : leading > 0
+            ? '当前组领先 ${leading.abs().toStringAsFixed(1)}m'
+            : '对照组领先 ${leading.abs().toStringAsFixed(1)}m';
+
+    return Row(
+      children: [
+        _TinyStatusChip(
+          icon: Icons.timer_outlined,
+          label:
+              '${_formatDurationCompact(frame.elapsedSeconds)} / ${_formatDurationCompact(data.replaySeconds)}',
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: _TinyStatusChip(
+            icon: Icons.near_me_outlined,
+            label: label,
+            emphasize: leading.abs() >= 1,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TinyStatusChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool emphasize;
+
+  const _TinyStatusChip({
+    required this.icon,
+    required this.label,
+    this.emphasize = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = emphasize ? _swimPrimary : const Color(0xFF6B7280);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(7),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ComparisonMetricChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ComparisonMetricChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFF243142) : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(7),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.white : const Color(0xFF64748B),
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ComparisonMetricSummary extends StatelessWidget {
+  final _SwimComparisonData data;
+  final _ComparisonMetric metric;
+
+  const _ComparisonMetricSummary({required this.data, required this.metric});
+
+  @override
+  Widget build(BuildContext context) {
+    final values = _valuesForMetric();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _MetricValueColumn(
+              label: '当前组',
+              value: values.current,
+              color: const Color(0xFFFF8A2A),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: values.color.withValues(alpha: 0.11),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              values.summary,
+              style: TextStyle(
+                color: values.color,
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          Expanded(
+            child: _MetricValueColumn(
+              label: '对照组',
+              value: values.benchmark,
+              color: _swimPrimary,
+              alignEnd: true,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  _MetricSummaryValues _valuesForMetric() {
+    switch (metric) {
+      case _ComparisonMetric.pace:
+        final current = data.currentPaceSeconds;
+        final benchmark = data.benchmarkPaceSeconds;
+        if (current == null || benchmark == null) {
+          return const _MetricSummaryValues(
+            current: '--',
+            benchmark: '--',
+            summary: '数据不足',
+            color: Color(0xFF94A3B8),
+          );
+        }
+        final diff = (current - benchmark).abs();
+        if (diff == 0) {
+          return _MetricSummaryValues(
+            current: _formatMetricPace(current),
+            benchmark: _formatMetricPace(benchmark),
+            summary: '持平',
+            color: const Color(0xFF64748B),
+          );
+        }
+        final currentBetter = current < benchmark;
+        return _MetricSummaryValues(
+          current: _formatMetricPace(current),
+          benchmark: _formatMetricPace(benchmark),
+          summary: '${currentBetter ? '快' : '慢'} ${_formatMetricPace(diff)}',
+          color:
+              currentBetter ? const Color(0xFF10B981) : const Color(0xFFFF8A2A),
+        );
+      case _ComparisonMetric.distance:
+        final current = data.currentDistance;
+        final benchmark = data.benchmarkDistance;
+        final diff = (current - benchmark).abs();
+        if (diff == 0) {
+          return _MetricSummaryValues(
+            current: '${current}m',
+            benchmark: '${benchmark}m',
+            summary: '持平',
+            color: const Color(0xFF64748B),
+          );
+        }
+        return _MetricSummaryValues(
+          current: '${current}m',
+          benchmark: '${benchmark}m',
+          summary: current > benchmark ? '多 ${diff}m' : '少 ${diff}m',
+          color:
+              current > benchmark
+                  ? const Color(0xFF10B981)
+                  : const Color(0xFFFF8A2A),
+        );
+      case _ComparisonMetric.swolf:
+        final current = data.current.swolfAvg;
+        final benchmark = data.benchmark.swolfAvg;
+        if (current == null || benchmark == null) {
+          return _MetricSummaryValues(
+            current: current?.toString() ?? '--',
+            benchmark: benchmark?.toString() ?? '--',
+            summary: '数据不足',
+            color: const Color(0xFF94A3B8),
+          );
+        }
+        final diff = (current - benchmark).abs();
+        if (diff == 0) {
+          return _MetricSummaryValues(
+            current: '$current',
+            benchmark: '$benchmark',
+            summary: '持平',
+            color: const Color(0xFF64748B),
+          );
+        }
+        final currentBetter = current < benchmark;
+        return _MetricSummaryValues(
+          current: '$current',
+          benchmark: '$benchmark',
+          summary: '${currentBetter ? '低' : '高'} $diff',
+          color:
+              currentBetter ? const Color(0xFF10B981) : const Color(0xFFFF8A2A),
+        );
+      case _ComparisonMetric.heartRate:
+        final current = data.current.heartRateAvg;
+        final benchmark = data.benchmark.heartRateAvg;
+        if (current == null || benchmark == null) {
+          return _MetricSummaryValues(
+            current: current == null ? '--' : '${current}bpm',
+            benchmark: benchmark == null ? '--' : '${benchmark}bpm',
+            summary: '数据不足',
+            color: const Color(0xFF94A3B8),
+          );
+        }
+        final diff = (current - benchmark).abs();
+        if (diff == 0) {
+          return _MetricSummaryValues(
+            current: '${current}bpm',
+            benchmark: '${benchmark}bpm',
+            summary: '持平',
+            color: const Color(0xFF64748B),
+          );
+        }
+        return _MetricSummaryValues(
+          current: '${current}bpm',
+          benchmark: '${benchmark}bpm',
+          summary: current > benchmark ? '高 $diff' : '低 $diff',
+          color: const Color(0xFFE11D48),
+        );
+    }
+  }
+}
+
+class _MetricSummaryValues {
+  final String current;
+  final String benchmark;
+  final String summary;
+  final Color color;
+
+  const _MetricSummaryValues({
+    required this.current,
+    required this.benchmark,
+    required this.summary,
+    required this.color,
+  });
+}
+
+class _MetricValueColumn extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  final bool alignEnd;
+
+  const _MetricValueColumn({
+    required this.label,
+    required this.value,
+    required this.color,
+    this.alignEnd = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment:
+          alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFF94A3B8),
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: color,
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SwimComparisonPainter extends CustomPainter {
+  final _SwimComparisonData data;
+  final _SwimPlaybackFrame frame;
+  final double phase;
+  final double strokeProgress;
+  final ui.Image? currentSwimmerSprite;
+  final ui.Image? benchmarkSwimmerSprite;
+
+  const _SwimComparisonPainter({
+    required this.data,
+    required this.frame,
+    required this.phase,
+    required this.strokeProgress,
+    required this.currentSwimmerSprite,
+    required this.benchmarkSwimmerSprite,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final laneLeft = 52.0;
+    final laneRight = size.width - 14;
+    final laneWidth = math.max(1.0, laneRight - laneLeft);
+    final topLaneY = size.height * 0.36;
+    final bottomLaneY = size.height * 0.68;
+
+    final gridPaint =
+        Paint()
+          ..color = const Color(0xFF9CCCE3).withValues(alpha: 0.35)
+          ..strokeWidth = 1;
+    for (final ratio in [0.0, 0.25, 0.5, 0.75, 1.0]) {
+      final x = laneLeft + laneWidth * ratio;
+      canvas.drawLine(Offset(x, 14), Offset(x, size.height - 15), gridPaint);
+    }
+
+    _paintText(
+      canvas,
+      '当前',
+      Offset(12, topLaneY - 8),
+      const TextStyle(
+        color: Color(0xFFFF8A2A),
+        fontSize: 10,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+    _paintText(
+      canvas,
+      '对照',
+      Offset(12, bottomLaneY - 8),
+      TextStyle(
+        color: _swimPrimary.withValues(alpha: 0.95),
+        fontSize: 10,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+
+    _paintText(
+      canvas,
+      '0m',
+      Offset(laneLeft - 7, size.height - 12),
+      const TextStyle(color: Color(0xFF7A8495), fontSize: 9),
+    );
+    _paintText(
+      canvas,
+      '25m',
+      Offset(laneRight - 21, size.height - 12),
+      const TextStyle(color: Color(0xFF7A8495), fontSize: 9),
+    );
+    _paintText(
+      canvas,
+      '12.5m',
+      Offset(laneLeft + laneWidth * 0.5 - 14, size.height - 12),
+      const TextStyle(color: Color(0xFF7A8495), fontSize: 9),
+    );
+
+    final currentLane = _lanePositionForMeters(frame.currentMeters);
+    final benchmarkLane = _lanePositionForMeters(frame.benchmarkMeters);
+    final currentX = laneLeft + laneWidth * currentLane.ratio;
+    final benchmarkX = laneLeft + laneWidth * benchmarkLane.ratio;
+    _drawProgressTrail(
+      canvas,
+      laneLeft: laneLeft,
+      laneRight: laneRight,
+      swimmerX: currentX,
+      y: topLaneY,
+      direction: currentLane.direction,
+      color: const Color(0xFFFF8A2A),
+    );
+    _drawProgressTrail(
+      canvas,
+      laneLeft: laneLeft,
+      laneRight: laneRight,
+      swimmerX: benchmarkX,
+      y: bottomLaneY,
+      direction: benchmarkLane.direction,
+      color: _swimPrimary,
+    );
+    _drawDistanceLabel(
+      canvas,
+      '${frame.currentMeters.round()}m',
+      right: laneRight - 6,
+      top: topLaneY - 27,
+    );
+    _drawDistanceLabel(
+      canvas,
+      '${frame.benchmarkMeters.round()}m',
+      right: laneRight - 6,
+      top: bottomLaneY - 27,
+    );
+
+    _drawSwimmer(
+      canvas,
+      Offset(currentX, topLaneY),
+      const Color(0xFFFF8A2A),
+      strokeProgress,
+      spriteSheet: currentSwimmerSprite,
+      direction: currentLane.direction,
+    );
+    _drawSwimmer(
+      canvas,
+      Offset(benchmarkX, bottomLaneY),
+      _swimPrimary,
+      strokeProgress,
+      spriteSheet: benchmarkSwimmerSprite,
+      direction: benchmarkLane.direction,
+    );
+  }
+
+  void _drawProgressTrail(
+    Canvas canvas, {
+    required double laneLeft,
+    required double laneRight,
+    required double swimmerX,
+    required double y,
+    required int direction,
+    required Color color,
+  }) {
+    final start = Offset(swimmerX - direction * 15, y);
+    final end = Offset(direction > 0 ? laneLeft : laneRight, y);
+    if ((end.dx - start.dx).abs() < 1) return;
+
+    final trail =
+        Paint()
+          ..shader = ui.Gradient.linear(
+            start,
+            end,
+            [
+              color.withValues(alpha: 0.62),
+              color.withValues(alpha: 0.24),
+              color.withValues(alpha: 0.04),
+            ],
+            const [0.0, 0.55, 1.0],
+          )
+          ..strokeWidth = 2.25
+          ..strokeCap = StrokeCap.round;
+    canvas.drawLine(start, end, trail);
+
+    final distance = end.dx - start.dx;
+    for (final ratio in [0.25, 0.5, 0.75, 1.0]) {
+      final marker = Paint()
+        ..color = color.withValues(alpha: 0.56 - ratio * 0.46);
+      canvas.drawCircle(
+        Offset(start.dx + distance * ratio, y),
+        ratio == 0.25 ? 2.0 : 1.4,
+        marker,
+      );
+    }
+  }
+
+  void _drawDistanceLabel(
+    Canvas canvas,
+    String text,
+    {
+    required double right,
+    required double top,
+    }
+  ) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: const TextStyle(
+          color: Color(0xFF667085),
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    painter.paint(canvas, Offset(right - painter.width, top));
+  }
+
+  void _drawSwimmer(
+    Canvas canvas,
+    Offset center,
+    Color color,
+    double strokeProgress, {
+    required ui.Image? spriteSheet,
+    required int direction,
+  }) {
+    if (spriteSheet != null) {
+      _drawSpriteSwimmer(
+        canvas,
+        center,
+        color,
+        strokeProgress,
+        spriteSheet: spriteSheet,
+        direction: direction,
+      );
+      return;
+    }
+
+    _drawFallbackSwimmer(
+      canvas,
+      center,
+      color,
+      strokeProgress * math.pi * 2,
+      direction: direction,
+    );
+  }
+
+  void _drawSpriteSwimmer(
+    Canvas canvas,
+    Offset center,
+    Color color,
+    double strokeProgress, {
+    required ui.Image spriteSheet,
+    required int direction,
+  }) {
+    final frameWidth = spriteSheet.width / _swimmerSpriteFrameCount;
+    final frameIndex =
+        (strokeProgress * _swimmerSpriteFrameCount).floor() %
+        _swimmerSpriteFrameCount;
+    final sourceRect = Rect.fromLTWH(
+      frameIndex * frameWidth,
+      0,
+      frameWidth,
+      spriteSheet.height.toDouble(),
+    );
+    final aspectRatio = frameWidth / spriteSheet.height;
+    const targetWidth = 38.0;
+    final targetRect = Rect.fromCenter(
+      center: Offset.zero,
+      width: targetWidth,
+      height: targetWidth / aspectRatio,
+    );
+    final strokeRadians = strokeProgress * math.pi * 2;
+    final bob = math.sin(strokeRadians) * 1.4;
+    canvas.save();
+    canvas.translate(center.dx, center.dy + bob);
+    if (direction > 0) {
+      canvas.scale(-1, 1);
+    }
+    canvas.drawImageRect(
+      spriteSheet,
+      sourceRect,
+      targetRect,
+      Paint()..filterQuality = FilterQuality.medium,
+    );
+    canvas.restore();
+  }
+
+  void _drawFallbackSwimmer(
+    Canvas canvas,
+    Offset center,
+    Color color,
+    double stroke, {
+    required int direction,
+  }) {
+    final bob = math.sin(stroke * 1.8) * 2.0;
+    final bodyPaint = Paint()..color = color;
+    final headPaint = Paint()..color = color.withValues(alpha: 0.9);
+    final limbPaint =
+        Paint()
+          ..color = color.withValues(alpha: 0.9)
+          ..strokeWidth = 3
+          ..strokeCap = StrokeCap.round;
+    canvas.save();
+    canvas.translate(center.dx, center.dy + bob);
+    canvas.scale(0.82);
+    if (direction < 0) {
+      canvas.scale(-1, 1);
+    }
+
+    final reach = math.sin(stroke);
+    canvas.drawLine(const Offset(2, -3), Offset(20, -9 + reach * 8), limbPaint);
+    canvas.drawLine(const Offset(-5, 4), Offset(-22, 8 - reach * 5), limbPaint);
+
+    canvas.save();
+    canvas.rotate(-0.10 + math.sin(stroke) * 0.05);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset.zero, width: 28, height: 11),
+        const Radius.circular(7),
+      ),
+      bodyPaint,
+    );
+    canvas.restore();
+
+    canvas.drawCircle(const Offset(16, -5), 5.2, headPaint);
+
+    final splashPaint = Paint()..color = color.withValues(alpha: 0.38);
+    canvas.drawCircle(Offset(-28, 7 + reach * 2), 2.2, splashPaint);
+    canvas.drawCircle(Offset(-38, 3 - reach * 2), 1.6, splashPaint);
+    canvas.drawCircle(Offset(25, 6 - reach), 1.7, splashPaint);
+    canvas.restore();
+  }
+
+  void _paintText(Canvas canvas, String text, Offset offset, TextStyle style) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    painter.paint(canvas, offset);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SwimComparisonPainter oldDelegate) {
+    return oldDelegate.phase != phase ||
+        oldDelegate.strokeProgress != strokeProgress ||
+        oldDelegate.currentSwimmerSprite != currentSwimmerSprite ||
+        oldDelegate.benchmarkSwimmerSprite != benchmarkSwimmerSprite ||
+        oldDelegate.frame.currentMeters != frame.currentMeters ||
+        oldDelegate.frame.benchmarkMeters != frame.benchmarkMeters ||
+        oldDelegate.data.current.id != data.current.id ||
+        oldDelegate.data.benchmark.id != data.benchmark.id;
+  }
+}
+
 enum _SwimMetric { distance, pace, swolf }
 
 int? _parsePaceToSeconds(String? pace) {
   if (pace == null || pace.isEmpty) return null;
-  final clean = pace.replaceAll('"', '').replaceAll('\u201d', '').trim();
-  final parts = clean.split("'");
+  final clean =
+      pace
+          .replaceAll('"', '')
+          .replaceAll('\u201d', '')
+          .replaceAll('\u2033', '')
+          .replaceAll('\u2019', "'")
+          .replaceAll('\u2032', "'")
+          .trim();
+  final separator =
+      clean.contains("'")
+          ? "'"
+          : clean.contains(':')
+          ? ':'
+          : null;
+  if (separator == null) return null;
+  final parts = clean.split(separator);
   if (parts.length != 2) return null;
   final mins = int.tryParse(parts[0].trim());
   final secs = int.tryParse(parts[1].trim());
@@ -1268,7 +2843,11 @@ class _DistanceChart extends StatefulWidget {
   final int year;
   final int month;
 
-  const _DistanceChart({required this.sessions, required this.year, required this.month});
+  const _DistanceChart({
+    required this.sessions,
+    required this.year,
+    required this.month,
+  });
 
   @override
   State<_DistanceChart> createState() => _DistanceChartState();
@@ -1283,60 +2862,82 @@ class _DistanceChartState extends State<_DistanceChart> {
 
     final daysInMonth = DateTime(widget.year, widget.month + 1, 0).day;
     final spots = <FlSpot>[];
-    double maxY = 1;
 
     if (_metric == _SwimMetric.distance) {
       final distanceByDay = <int, int>{};
       for (final s in widget.sessions) {
-        distanceByDay[s.date.day] = (distanceByDay[s.date.day] ?? 0) + (s.totalDistanceMeters ?? 0);
+        distanceByDay[s.date.day] =
+            (distanceByDay[s.date.day] ?? 0) + (s.totalDistanceMeters ?? 0);
       }
       for (int day = 1; day <= daysInMonth; day++) {
         if (distanceByDay[day] != null) {
           spots.add(FlSpot(day.toDouble(), (distanceByDay[day]! / 1000)));
         }
       }
-      if (spots.isNotEmpty) maxY = spots.map((s) => s.y).reduce((a, b) => a > b ? a : b);
     } else if (_metric == _SwimMetric.pace) {
       for (final s in widget.sessions) {
         final pace = _parsePaceToSeconds(s.avgPace);
         if (pace != null) {
-          spots.add(FlSpot(s.date.day.toDouble(), pace.toDouble()));
+          spots.add(FlSpot(s.date.day.toDouble(), -pace.toDouble()));
         }
       }
-      if (spots.isNotEmpty) maxY = spots.map((s) => s.y).reduce((a, b) => a > b ? a : b);
     } else if (_metric == _SwimMetric.swolf) {
       for (final s in widget.sessions) {
         if (s.swolfAvg != null) {
           spots.add(FlSpot(s.date.day.toDouble(), s.swolfAvg!.toDouble()));
         }
       }
-      if (spots.isNotEmpty) maxY = spots.map((s) => s.y).reduce((a, b) => a > b ? a : b);
     }
 
     if (spots.isEmpty) return const SizedBox.shrink();
-    if (maxY < 1) maxY = 1;
+    spots.sort((a, b) => a.x.compareTo(b.x));
+    final rawMinY = spots.map((spot) => spot.y).reduce(math.min);
+    final rawMaxY = spots.map((spot) => spot.y).reduce(math.max);
+    final minimumSpan = switch (_metric) {
+      _SwimMetric.distance => 0.5,
+      _SwimMetric.pace => 30.0,
+      _SwimMetric.swolf => 10.0,
+    };
+    final dataSpan = math.max(rawMaxY - rawMinY, minimumSpan);
+    final centerY = (rawMinY + rawMaxY) / 2;
+    var chartMinY = centerY - dataSpan * 0.7;
+    var chartMaxY = centerY + dataSpan * 0.7;
+    if (_metric != _SwimMetric.pace && chartMinY < 0) {
+      chartMaxY -= chartMinY;
+      chartMinY = 0;
+    }
+    final yInterval = (chartMaxY - chartMinY) / 3;
 
     String metricLabel() {
       switch (_metric) {
-        case _SwimMetric.distance: return '游泳距离 (公里)';
-        case _SwimMetric.pace: return '配速 (分:秒/百米)';
-        case _SwimMetric.swolf: return 'SWOLF 指数';
+        case _SwimMetric.distance:
+          return '游泳距离 (公里)';
+        case _SwimMetric.pace:
+          return '配速 (分:秒/百米)';
+        case _SwimMetric.swolf:
+          return 'SWOLF 指数';
       }
     }
 
     String metricValue(double value) {
       switch (_metric) {
-        case _SwimMetric.distance: return '${value.toStringAsFixed(2)}km';
-        case _SwimMetric.pace: return _secondsToPace(value.toInt());
-        case _SwimMetric.swolf: return value.toInt().toString();
+        case _SwimMetric.distance:
+          return '${value.toStringAsFixed(2)}km';
+        case _SwimMetric.pace:
+          return _secondsToPace(value.abs().round());
+        case _SwimMetric.swolf:
+          return value.toInt().toString();
       }
     }
 
     Color metricColor() {
       switch (_metric) {
-        case _SwimMetric.distance: return _swimPrimary;
-        case _SwimMetric.pace: return const Color(0xFF52C9A4);
-        case _SwimMetric.swolf: return const Color(0xFFFF8FA3);
+        case _SwimMetric.distance:
+          return _swimPrimary;
+        case _SwimMetric.pace:
+          return const Color(0xFF52C9A4);
+        case _SwimMetric.swolf:
+          return const Color(0xFFFF8FA3);
       }
     }
 
@@ -1360,11 +2961,14 @@ class _DistanceChartState extends State<_DistanceChart> {
             children: [
               const Text('📈', style: TextStyle(fontSize: 16)),
               const SizedBox(width: 6),
-              const Text('进步趋势', style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF3D3D3D),
-              )),
+              const Text(
+                '进步趋势',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF3D3D3D),
+                ),
+              ),
               const Spacer(),
               _MetricChip(
                 label: '距离',
@@ -1388,42 +2992,42 @@ class _DistanceChartState extends State<_DistanceChart> {
           const SizedBox(height: 6),
           Text(
             metricLabel(),
-            style: TextStyle(
-              color: Colors.grey.shade500,
-              fontSize: 12,
-            ),
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
           SizedBox(
-            height: 160,
+            height: 120,
             child: LineChart(
               LineChartData(
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  horizontalInterval: (maxY / 3).ceilToDouble().clamp(0.5, double.infinity),
-                  getDrawingHorizontalLine: (value) => FlLine(
-                    color: Colors.grey.shade200,
-                    strokeWidth: 1,
-                  ),
+                  horizontalInterval: yInterval,
+                  getDrawingHorizontalLine:
+                      (value) =>
+                          FlLine(color: Colors.grey.shade200, strokeWidth: 1),
                 ),
                 titlesData: FlTitlesData(
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: _metric == _SwimMetric.pace ? 48 : 36,
-                      interval: (maxY / 3).ceilToDouble().clamp(0.5, double.infinity),
-                      getTitlesWidget: (value, meta) => Padding(
-                        padding: const EdgeInsets.only(right: 4),
-                        child: Text(
-                          _metric == _SwimMetric.distance
-                              ? value.toStringAsFixed(1)
-                              : _metric == _SwimMetric.pace
-                                  ? _secondsToPace(value.toInt())
+                      interval: yInterval,
+                      getTitlesWidget:
+                          (value, meta) => Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: Text(
+                              _metric == _SwimMetric.distance
+                                  ? value.toStringAsFixed(1)
+                                  : _metric == _SwimMetric.pace
+                                  ? _secondsToPace(value.abs().round())
                                   : '${value.toInt()}',
-                          style: TextStyle(color: Colors.grey.shade500, fontSize: 10),
-                        ),
-                      ),
+                              style: TextStyle(
+                                color: Colors.grey.shade500,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
                     ),
                   ),
                   bottomTitles: AxisTitles(
@@ -1432,60 +3036,61 @@ class _DistanceChartState extends State<_DistanceChart> {
                       reservedSize: 28,
                       interval: daysInMonth > 28 ? 7 : 5,
                       getTitlesWidget: (value, meta) {
-                        if (value == value.roundToDouble() && value >= 1 && value <= daysInMonth) {
+                        if (value == value.roundToDouble() &&
+                            value >= 1 &&
+                            value <= daysInMonth) {
                           return Text(
                             '${value.toInt()}日',
-                            style: TextStyle(color: Colors.grey.shade500, fontSize: 10),
+                            style: TextStyle(
+                              color: Colors.grey.shade500,
+                              fontSize: 10,
+                            ),
                           );
                         }
                         return const SizedBox.shrink();
                       },
                     ),
                   ),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
                 ),
                 borderData: FlBorderData(show: false),
                 minX: 1,
                 maxX: daysInMonth.toDouble(),
-                minY: 0,
-                maxY: maxY * 1.15,
+                minY: chartMinY,
+                maxY: chartMaxY,
                 lineBarsData: [
                   LineChartBarData(
                     spots: spots,
                     isCurved: true,
                     curveSmoothness: 0.3,
                     color: metricColor(),
-                    barWidth: 3,
-                    dotData: FlDotData(
-                      show: true,
-                      getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
-                        radius: 4,
-                        color: Colors.white,
-                        strokeWidth: 2,
-                        strokeColor: metricColor(),
-                      ),
-                    ),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          metricColor().withValues(alpha: 0.3),
-                          metricColor().withValues(alpha: 0.0),
-                        ],
-                      ),
-                    ),
+                    barWidth: 2,
+                    dotData: const FlDotData(show: false),
+                    belowBarData: BarAreaData(show: false),
                   ),
                 ],
                 lineTouchData: LineTouchData(
                   touchTooltipData: LineTouchTooltipData(
                     getTooltipColor: (touchedSpot) => metricColor(),
-                    getTooltipItems: (spots) => spots.map((spot) => LineTooltipItem(
-                      metricValue(spot.y),
-                      const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12),
-                    )).toList(),
+                    getTooltipItems:
+                        (spots) =>
+                            spots
+                                .map(
+                                  (spot) => LineTooltipItem(
+                                    metricValue(spot.y),
+                                    const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                )
+                                .toList(),
                   ),
                 ),
               ),
@@ -1502,7 +3107,11 @@ class _MetricChip extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  const _MetricChip({required this.label, required this.selected, required this.onTap});
+  const _MetricChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1511,7 +3120,10 @@ class _MetricChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: selected ? _swimPrimary.withValues(alpha: 0.15) : Colors.grey.shade200,
+          color:
+              selected
+                  ? _swimPrimary.withValues(alpha: 0.15)
+                  : Colors.grey.shade200,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
@@ -1531,7 +3143,10 @@ class _StyleBreakdownCard extends StatelessWidget {
   final List<MapEntry<SwimStyle, int>> sortedStyles;
   final int totalDistance;
 
-  const _StyleBreakdownCard({required this.sortedStyles, required this.totalDistance});
+  const _StyleBreakdownCard({
+    required this.sortedStyles,
+    required this.totalDistance,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1555,16 +3170,20 @@ class _StyleBreakdownCard extends StatelessWidget {
             children: [
               Text('🎯', style: TextStyle(fontSize: 16)),
               SizedBox(width: 6),
-              Text('泳姿分布', style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF3D3D3D),
-              )),
+              Text(
+                '泳姿分布',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF3D3D3D),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
           ...sortedStyles.map((entry) {
-            final pct = totalDistance > 0 ? (entry.value / totalDistance * 100) : 0.0;
+            final pct =
+                totalDistance > 0 ? (entry.value / totalDistance * 100) : 0.0;
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Column(
@@ -1572,20 +3191,35 @@ class _StyleBreakdownCard extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Text(_styleEmoji(entry.key), style: const TextStyle(fontSize: 14)),
+                      Text(
+                        _styleEmoji(entry.key),
+                        style: const TextStyle(fontSize: 14),
+                      ),
                       const SizedBox(width: 8),
-                      Text(_styleName(entry.key), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                      Text(
+                        _styleName(entry.key),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                       const Spacer(),
-                      Text('${(entry.value / 1000).toStringAsFixed(1)}km', style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF555555),
-                      )),
+                      Text(
+                        '${(entry.value / 1000).toStringAsFixed(1)}km',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF555555),
+                        ),
+                      ),
                       const SizedBox(width: 8),
-                      Text('${pct.toStringAsFixed(0)}%', style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade500,
-                      )),
+                      Text(
+                        '${pct.toStringAsFixed(0)}%',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -1594,7 +3228,9 @@ class _StyleBreakdownCard extends StatelessWidget {
                     child: LinearProgressIndicator(
                       value: pct / 100,
                       backgroundColor: Colors.grey.shade200,
-                      valueColor: AlwaysStoppedAnimation<Color>(_swimPrimary.withValues(alpha: 0.7)),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        _swimPrimary.withValues(alpha: 0.7),
+                      ),
                       minHeight: 6,
                     ),
                   ),
@@ -1609,21 +3245,31 @@ class _StyleBreakdownCard extends StatelessWidget {
 
   String _styleEmoji(SwimStyle style) {
     switch (style) {
-      case SwimStyle.freestyle: return '🏊';
-      case SwimStyle.breaststroke: return '🐸';
-      case SwimStyle.backstroke: return '🔄';
-      case SwimStyle.butterfly: return '🦋';
-      case SwimStyle.medley: return '🌊';
+      case SwimStyle.freestyle:
+        return '🏊';
+      case SwimStyle.breaststroke:
+        return '🐸';
+      case SwimStyle.backstroke:
+        return '🔄';
+      case SwimStyle.butterfly:
+        return '🦋';
+      case SwimStyle.medley:
+        return '🌊';
     }
   }
 
   String _styleName(SwimStyle style) {
     switch (style) {
-      case SwimStyle.freestyle: return '自由泳';
-      case SwimStyle.breaststroke: return '蛙泳';
-      case SwimStyle.backstroke: return '仰泳';
-      case SwimStyle.butterfly: return '蝶泳';
-      case SwimStyle.medley: return '混合泳';
+      case SwimStyle.freestyle:
+        return '自由泳';
+      case SwimStyle.breaststroke:
+        return '蛙泳';
+      case SwimStyle.backstroke:
+        return '仰泳';
+      case SwimStyle.butterfly:
+        return '蝶泳';
+      case SwimStyle.medley:
+        return '混合泳';
     }
   }
 }
@@ -1637,9 +3283,10 @@ class _PersonalRecordsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<WorkoutProvider>(
       builder: (context, provider, _) {
-        final allSwimSessions = provider.sessions
-            .where((s) => s.type == WorkoutType.swim && s.countsAsWorkout)
-            .toList();
+        final allSwimSessions =
+            provider.sessions
+                .where((s) => s.type == WorkoutType.swim && s.countsAsWorkout)
+                .toList();
 
         int maxDist = 0;
         int bestPaceMin = 999;
@@ -1657,7 +3304,8 @@ class _PersonalRecordsCard extends StatelessWidget {
           if (dist > 0 && duration > 0) {
             final pacePerHm = duration / (dist / 100);
             final totalSec = (pacePerHm * 60).round();
-            if (totalSec < bestPaceMin * 60 + bestPaceSec || bestPaceMin == 999) {
+            if (totalSec < bestPaceMin * 60 + bestPaceSec ||
+                bestPaceMin == 999) {
               bestPaceMin = totalSec ~/ 60;
               bestPaceSec = totalSec % 60;
             }
@@ -1686,38 +3334,58 @@ class _PersonalRecordsCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Text('🏆', style: TextStyle(fontSize: 16, color: _swimPrimary)),
+                  Text(
+                    '🏆',
+                    style: TextStyle(fontSize: 16, color: _swimPrimary),
+                  ),
                   const SizedBox(width: 6),
-                  const Text('历史最佳', style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF3D3D3D),
-                  )),
+                  const Text(
+                    '历史最佳',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF3D3D3D),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Expanded(child: _RecordTile(
-                    label: '最远距离',
-                    value: maxDist > 0 ? '${(maxDist / 1000).toStringAsFixed(1)}km' : '--',
-                    color: _swimPrimary,
-                  )),
-                  Expanded(child: _RecordTile(
-                    label: '最久时长',
-                    value: longestSession > 0 ? '$longestSession分钟' : '--',
-                    color: const Color(0xFF52C9A4),
-                  )),
-                  Expanded(child: _RecordTile(
-                    label: '最快配速',
-                    value: bestPaceMin < 999 ? '$bestPaceMin\'${bestPaceSec.toString().padLeft(2, '0')}' : '--',
-                    color: const Color(0xFFFFB347),
-                  )),
-                  Expanded(child: _RecordTile(
-                    label: '最佳SWOLF',
-                    value: bestSwolf < 999 ? '$bestSwolf' : '--',
-                    color: const Color(0xFF9B59B6),
-                  )),
+                  Expanded(
+                    child: _RecordTile(
+                      label: '最远距离',
+                      value:
+                          maxDist > 0
+                              ? '${(maxDist / 1000).toStringAsFixed(1)}km'
+                              : '--',
+                      color: _swimPrimary,
+                    ),
+                  ),
+                  Expanded(
+                    child: _RecordTile(
+                      label: '最久时长',
+                      value: longestSession > 0 ? '$longestSession分钟' : '--',
+                      color: const Color(0xFF52C9A4),
+                    ),
+                  ),
+                  Expanded(
+                    child: _RecordTile(
+                      label: '最快配速',
+                      value:
+                          bestPaceMin < 999
+                              ? '$bestPaceMin\'${bestPaceSec.toString().padLeft(2, '0')}'
+                              : '--',
+                      color: const Color(0xFFFFB347),
+                    ),
+                  ),
+                  Expanded(
+                    child: _RecordTile(
+                      label: '最佳SWOLF',
+                      value: bestSwolf < 999 ? '$bestSwolf' : '--',
+                      color: const Color(0xFF9B59B6),
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -1760,10 +3428,7 @@ class _RecordTile extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             label,
-            style: TextStyle(
-              color: color.withValues(alpha: 0.7),
-              fontSize: 10,
-            ),
+            style: TextStyle(color: color.withValues(alpha: 0.7), fontSize: 10),
           ),
         ],
       ),
@@ -1798,11 +3463,14 @@ class _RecentSwimsCard extends StatelessWidget {
             children: [
               Text('📋', style: TextStyle(fontSize: 16)),
               SizedBox(width: 6),
-              Text('近期记录', style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF3D3D3D),
-              )),
+              Text(
+                '近期记录',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF3D3D3D),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -1829,11 +3497,16 @@ class _SwimSessionTile extends StatelessWidget {
 
   String _styleEmoji(SwimStyle style) {
     switch (style) {
-      case SwimStyle.freestyle: return '🏊';
-      case SwimStyle.breaststroke: return '🐸';
-      case SwimStyle.backstroke: return '🔄';
-      case SwimStyle.butterfly: return '🦋';
-      case SwimStyle.medley: return '🌊';
+      case SwimStyle.freestyle:
+        return '🏊';
+      case SwimStyle.breaststroke:
+        return '🐸';
+      case SwimStyle.backstroke:
+        return '🔄';
+      case SwimStyle.butterfly:
+        return '🦋';
+      case SwimStyle.medley:
+        return '🌊';
     }
   }
 
@@ -1847,9 +3520,11 @@ class _SwimSessionTile extends StatelessWidget {
     if (session.swimSets != null && session.swimSets!.isNotEmpty) {
       final styleCount = <SwimStyle, int>{};
       for (final set in session.swimSets!) {
-        styleCount[set.style] = (styleCount[set.style] ?? 0) + set.distanceMeters;
+        styleCount[set.style] =
+            (styleCount[set.style] ?? 0) + set.distanceMeters;
       }
-      topStyle = styleCount.entries.reduce((a, b) => a.value > b.value ? a : b).key;
+      topStyle =
+          styleCount.entries.reduce((a, b) => a.value > b.value ? a : b).key;
     }
     final styleEmoji = topStyle != null ? _styleEmoji(topStyle) : '🏊';
 
@@ -1884,10 +3559,7 @@ class _SwimSessionTile extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   _buildSessionDetail(session),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade500,
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
                 ),
               ],
             ),
@@ -1906,10 +3578,7 @@ class _SwimSessionTile extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 '$duration分钟',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade500,
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
               ),
             ],
           ),
@@ -1921,7 +3590,10 @@ class _SwimSessionTile extends StatelessWidget {
   String _buildSessionDetail(WorkoutSession s) {
     final parts = <String>[];
     if (s.swimSets != null && s.swimSets!.isNotEmpty) {
-      final styles = s.swimSets!.map((set) => _styleNameShort(set.style)).toSet().join('·');
+      final styles = s.swimSets!
+          .map((set) => _styleNameShort(set.style))
+          .toSet()
+          .join('·');
       if (styles.isNotEmpty) parts.add(styles);
     }
     if (s.poolLengthMeters != null) {
@@ -1933,11 +3605,16 @@ class _SwimSessionTile extends StatelessWidget {
 
   String _styleNameShort(SwimStyle style) {
     switch (style) {
-      case SwimStyle.freestyle: return '自由泳';
-      case SwimStyle.breaststroke: return '蛙泳';
-      case SwimStyle.backstroke: return '仰泳';
-      case SwimStyle.butterfly: return '蝶泳';
-      case SwimStyle.medley: return '混合泳';
+      case SwimStyle.freestyle:
+        return '自由泳';
+      case SwimStyle.breaststroke:
+        return '蛙泳';
+      case SwimStyle.backstroke:
+        return '仰泳';
+      case SwimStyle.butterfly:
+        return '蝶泳';
+      case SwimStyle.medley:
+        return '混合泳';
     }
   }
 }
